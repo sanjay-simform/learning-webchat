@@ -36,7 +36,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  @Throttle({ default: { limit: 5, ttl: 3600 } })
+  // @Throttle({ default: { limit: 5, ttl: 3600 } })
   async login(@Body() dto: LoginRequestDto): Promise<AuthResponseDto> {
     const { user, token } = await this.authService.login(dto);
 
@@ -45,6 +45,7 @@ export class AuthController {
       user: {
         id: user.id,
         username: user.username,
+        cryptoData: user.cryptoData,
       },
     };
   }

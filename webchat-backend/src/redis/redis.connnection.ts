@@ -26,7 +26,7 @@ export const redisConnection = new IORedis({
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-redisConnection.on('ready', () => logger.log('Redis Successfully Connected'));
+redisConnection.on('connect', () => logger.log('Redis Successfully Connected'));
 // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 redisConnection.on('error', (e) => logger.error('Redis Connection Error', e));
 

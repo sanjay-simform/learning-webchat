@@ -59,9 +59,16 @@ export class User {
   @Column({
     type: 'text',
     nullable: true,
-    comment: 'RSA private key (encrypted, base64)',
+    comment: 'RSA private ciphertext (base64)',
   })
-  rsa_private_key: string;
+  rsa_private_cipher_text: string;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+    comment: 'RSA private iv (base64)',
+  })
+  rsa_private_iv: string;
 
   @CreateDateColumn({
     type: 'timestamptz',

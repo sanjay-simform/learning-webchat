@@ -1,11 +1,22 @@
-import { defineConfig } from 'vite'
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
-import babel from '@rolldown/plugin-babel'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
-    babel({ presets: [reactCompilerPreset()] })
+    //  mkcert()
   ],
-})
+  // server: {
+  //   host: true,
+  //   https: true,
+  // },
+  // proxy: {
+  //   api: {
+  //     target: "https://172.16.4.239:4001",
+  //     changeOrigin: true,
+  //     secure: false, // ⚠️ Disables SSL verification (dev only!)
+  //   },
+  // },
+});

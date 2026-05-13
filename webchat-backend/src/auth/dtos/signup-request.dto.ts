@@ -21,8 +21,10 @@ class RsaDto {
   @IsString()
   publicKey: string;
 
-  @IsString()
-  privateKey: string;
+  @IsObject()
+  @ValidateNested()
+  @Type(() => DekDto)
+  privateKey: DekDto;
 }
 
 export class CryptoDataDto {

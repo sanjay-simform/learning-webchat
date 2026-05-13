@@ -6,6 +6,7 @@ import { AuthService } from './services/auth.service';
 import { UserModule } from 'src/user/user.module';
 import { SharedModule } from 'src/shared/shared.module';
 import { RedisModule } from 'src/redis/redis.module';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RedisModule } from 'src/redis/redis.module';
   controllers: [AuthController],
   providers: [
     AuthService,
+    JwtAuthGuard,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

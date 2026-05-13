@@ -26,21 +26,28 @@ export class UserService {
       dek_cipher_text: input.cryptoData?.dek.cipherText,
       dek_iv: input.cryptoData?.dek.iv,
       rsa_public_key: input.cryptoData?.rsa.publicKey,
-      rsa_private_key: input.cryptoData?.rsa.privateKey,
+      rsa_private_cipher_text: input.cryptoData?.rsa.privateKey.cipherText,
+      rsa_private_iv: input.cryptoData?.rsa.privateKey.iv,
     });
 
     return this.userRepository.save(user);
   }
 
-  async findByUsername(username_normalized: string): Promise<{
-    id: string;
-    password: string;
-  } | null> {
+  async findByUsername(username_normalized: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: {
         username: username_normalized,
       },
-      select: ['id', 'password'],
+      select: [
+        'id',
+        'password',
+        'dek_cipher_text',
+        'dek_iv',
+        'rsa_public_key',
+        'rsa_private_cipher_text',
+        'rsa_private_iv',
+        'salt',
+      ],
     });
   }
 

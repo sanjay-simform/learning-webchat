@@ -1,111 +1,302 @@
+@import "tailwindcss";
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Backgrounds */
+  --bg-base: #141925;
+  --bg-elevated: #1a2030;
+  --bg-floating: #212838;
+  --bg-sidebar: #111621;
+  --bg-card: #202737;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Text */
+  --text-primary: #e6eaf2;
+  --text-secondary: #9aa4b2;
+  --text-muted: #6b7280;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Accents */
+  --accent-cyan: #5eead4;
+  --accent-violet: #a78bfa;
+  --accent-amber: #f6c177;
+  --accent-rose: #f38ba8;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  /* Semantic */
+  --success: #6ee7b7;
+  --danger: #fb7185;
+  --warning: #fbbf24;
+  --info: #67e8f9;
+
+  /* Animation */
+  --motion-duration-fast: 180ms;
+  --motion-duration-base: 220ms;
+  --motion-duration-slow: 280ms;
+  --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@layer base {
+  * {
+    border-color: rgb(42 51 68);
+  }
+
+  html {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+  }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-weight: 400;
+  }
+
+  input,
+  textarea {
+    background-color: var(--bg-elevated);
+    color: var(--text-primary);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  input:focus,
+  textarea:focus {
+    outline: none;
+    ring: 1px solid var(--accent-cyan);
+    ring-opacity: 0.5;
+  }
+
+  ::selection {
+    background-color: rgb(167 139 250 / 0.2);
+    color: var(--text-primary);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgb(107 114 128 / 0.3);
+    border-radius: 9999px;
+    transition: background-color 0.2s;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(154 164 178 / 0.4);
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+@layer components {
+  /* Background Utilities */
+  .chat-bg {
+    background-color: var(--bg-base);
   }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+  .chat-surface {
+    background-color: var(--bg-elevated);
+    border-radius: 22px;
   }
-}
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+  .chat-elevated {
+    background-color: var(--bg-elevated);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.16);
   }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+
+  .chat-floating {
+    background-color: var(--bg-floating);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+    backdrop-filter: blur(4px);
   }
-}
-p {
-  margin: 0;
-}
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+  .chat-sidebar {
+    background-color: var(--bg-sidebar);
+  }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  .chat-card {
+    background-color: var(--bg-card);
+    border-radius: 22px;
+    border: 1px solid rgb(42 51 68 / 0.75);
+  }
+
+  /* Text Utilities */
+  .chat-text-primary {
+    color: var(--text-primary);
+  }
+
+  .chat-text-secondary {
+    color: var(--text-secondary);
+  }
+
+  .chat-text-muted {
+    color: var(--text-muted);
+  }
+
+  /* Input Styles */
+  .chat-input {
+    background-color: var(--bg-elevated);
+    color: var(--text-primary);
+    border-radius: 22px;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgb(42 51 68 / 0.7);
+    transition: all 200ms;
+  }
+
+  .chat-input:focus {
+    border-color: var(--accent-cyan);
+    border-opacity: 0.5;
+    outline: none;
+    box-shadow: 0 0 0 1px rgb(94 234 212 / 0.28);
+  }
+
+  /* Message Bubbles */
+  .chat-bubble-self {
+    background: linear-gradient(
+      135deg,
+      rgba(167, 139, 250, 0.1) 0%,
+      rgba(94, 234, 212, 0.08) 100%
+    );
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    border-radius: 22px 22px 6px 22px;
+    padding: 0.5rem 1rem;
+    max-width: 20rem;
+    color: var(--text-primary);
+  }
+
+  .chat-bubble-other {
+    background-color: var(--bg-card);
+    border: 1px solid rgb(23 29 40 / 0.4);
+    border-radius: 22px 22px 22px 6px;
+    padding: 0.5rem 1rem;
+    max-width: 20rem;
+    color: var(--text-primary);
+    box-shadow: inset 0 0 1px rgba(167, 139, 250, 0.15);
+  }
+
+  /* Interactive States */
+  .chat-active {
+    box-shadow: 0 0 20px rgba(94, 234, 212, 0.12);
+    ring: 1px solid var(--accent-cyan);
+    ring-opacity: 0.4;
+  }
+
+  .chat-glow {
+    box-shadow: 0 0 20px rgba(94, 234, 212, 0.12);
+  }
+
+  /* Focus Ring */
+  .focus-ring {
+    outline: none;
+    box-shadow: 0 0 0 1px var(--accent-cyan);
+    opacity: 0.5;
+  }
+
+  .focus-ring:focus-visible {
+    opacity: 1;
+  }
+
+  /* Button Base */
+  .btn-base {
+    padding: 0.625rem 1rem;
+    border-radius: 22px;
+    font-weight: 500;
+    transition: all 200ms;
+    outline: none;
+    box-shadow: 0 0 0 1px rgb(42 51 68 / 0.85);
+    opacity: 1;
+  }
+
+  .btn-primary {
+    background-color: var(--accent-cyan);
+    color: #0f1115;
+    border: 1px solid rgb(94 234 212 / 0.35);
+    box-shadow: 0 8px 24px rgba(94, 234, 212, 0.16);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 10px 28px rgba(94, 234, 212, 0.2);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.95);
+  }
+
+  .btn-secondary {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid rgb(42 51 68 / 0.85);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--bg-floating);
+  }
+
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--text-primary);
+    border: 1px solid transparent;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--bg-elevated);
+  }
+
+  .btn-ghost:active {
+    background-color: var(--bg-card);
+  }
+
+  /* Link Styles */
+  .link-primary {
+    color: var(--accent-cyan);
+    transition: color 150ms;
+  }
+
+  .link-primary:hover {
+    color: var(--accent-violet);
+  }
+
+  /* Label */
+  .label-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  /* Error */
+  .error-text {
+    font-size: 0.875rem;
+    color: var(--danger);
+    margin-top: 0.25rem;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 22px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge-primary {
+    background-color: rgb(94 234 212 / 0.2);
+    color: var(--accent-cyan);
+  }
+
+  .badge-success {
+    background-color: rgb(110 231 183 / 0.2);
+    color: var(--success);
+  }
+
+  .badge-danger {
+    background-color: rgb(251 113 133 / 0.2);
+    color: var(--danger);
+  }
 }

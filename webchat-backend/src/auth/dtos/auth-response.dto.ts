@@ -1,4 +1,5 @@
 import { Expose } from 'class-transformer';
+import { CryptoDataDto } from './signup-request.dto';
 
 export class UserDto {
   @Expose()
@@ -6,6 +7,9 @@ export class UserDto {
 
   @Expose()
   username: string;
+
+  @Expose()
+  cryptoData?: CryptoDataDto;
 }
 
 export class AuthResponseDto {

@@ -6,9 +6,21 @@ import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { SharedModule } from './shared/shared.module';
+import { ConversationModule } from './conversation/conversation.module';
+import { SearchModule } from './search/search.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
-  imports: [DatabaseModule, RedisModule, SharedModule, UserModule, AuthModule],
+  imports: [
+    DatabaseModule,
+    RedisModule,
+    SharedModule,
+    UserModule,
+    AuthModule,
+    ConversationModule,
+    SearchModule,
+    ChatModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

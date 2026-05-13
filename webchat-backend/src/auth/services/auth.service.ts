@@ -6,7 +6,7 @@ import { UsernameService } from 'src/shared/services/username.service';
 import { JwtService } from 'src/shared/services/jwt.service';
 import { CacheService } from 'src/redis/services/cache.service';
 import { BloomFilterService } from 'src/redis/services/bloom-filter.service';
-import { SignupRequestDto } from '../dtos/signup-request.dto';
+import { CryptoDataDto, SignupRequestDto } from '../dtos/signup-request.dto';
 import { LoginRequestDto } from '../dtos/login-request.dto';
 import { UsernameAlreadyExistsException } from '../exceptions/username-already-exists.exception';
 import { InvalidCredentialsException } from '../exceptions/invalid-credentials.exception';
@@ -68,7 +68,7 @@ export class AuthService {
   }
 
   async login(dto: LoginRequestDto): Promise<{
-    user: { id: string; username: string };
+    user: { id: string; username: string; cryptoData: CryptoDataDto };
     token: string;
   }> {
     // 1. Normalize username
@@ -119,6 +119,20 @@ export class AuthService {
         user: {
           id: user.id,
           username: normalizedUsername,
+          cryptoData: {
+            salt: user.salt,
+            dek: {
+              cipherText: user.dek_cipher_text,
+              iv: user.dek_iv,
+            },
+            rsa: {
+              publicKey: user.rsa_public_key,
+              privateKey: {
+                cipherText: user.rsa_private_cipher_text,
+                iv: user.rsa_private_iv,
+              },
+            },
+          },
         },
         token,
       };
@@ -149,6 +163,20 @@ export class AuthService {
       user: {
         id: user.id,
         username: normalizedUsername,
+        cryptoData: {
+          salt: user.salt,
+          dek: {
+            cipherText: user.dek_cipher_text,
+            iv: user.dek_iv,
+          },
+          rsa: {
+            publicKey: user.rsa_public_key,
+            privateKey: {
+              cipherText: user.rsa_private_cipher_text,
+              iv: user.rsa_private_iv,
+            },
+          },
+        },
       },
       token,
     };
