@@ -21,7 +21,7 @@ export class AuthController {
 
   @Post('signup')
   @HttpCode(201)
-  @Throttle({ default: { limit: 5, ttl: 3600 } })
+  // @Throttle({ default: { limit: 5, ttl: 3600 } })
   async signup(@Body() dto: SignupRequestDto): Promise<AuthResponseDto> {
     const { user, token } = await this.authService.signup(dto);
 

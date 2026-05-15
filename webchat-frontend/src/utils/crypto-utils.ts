@@ -112,7 +112,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 // Convert Base64 string to ArrayBuffer
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
+export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary = window.atob(base64);
   const buffer = new Uint8Array([...binary].map((char) => char.charCodeAt(0)));
   return buffer.buffer;
@@ -355,4 +355,28 @@ export async function generateCryptoData(
       privateKey: encryptedPrivateKey,
     },
   };
+}
+
+export async function decryptMediaWithConversationKey(
+  conversationKey: string,
+  encryptedBuffer: ArrayBuffer,
+  iv: string,
+  authTag: string,
+): Promise<ArrayBuffer> {
+  console.log({
+    iv,
+    authTag,
+  });
+  const key = await importAesKeyFromBase64(conversationKey);
+
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: new Uint8Array(base64ToArrayBuffer(iv)),
+    },
+    key,
+    encryptedBuffer,
+  );
+
+  return decryptedBuffer;
 }

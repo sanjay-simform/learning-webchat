@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import axiosClient from "../../api-client";
 import type { ApiResponse, AxiosErrorResponse } from "../auth/auth.service.dto";
@@ -46,6 +46,28 @@ export function useMessages(conversationId: string, params?: MessagesQueryDto) {
       params?.limit ?? 50,
     ],
     queryFn: () => getMessagesApi(conversationId, params),
+    enabled: Boolean(conversationId),
+    staleTime: 1000 * 30,
+    retry: 1,
+  });
+}
+
+export function useInfiniteMessages(
+  conversationId: string,
+  params?: Omit<MessagesQueryDto, "cursor">,
+) {
+  const limit = params?.limit ?? 50;
+
+  return useInfiniteQuery({
+    queryKey: ["messages", conversationId, limit],
+    initialPageParam: "",
+    queryFn: ({ pageParam }) =>
+      getMessagesApi(conversationId, {
+        ...params,
+        cursor: pageParam || undefined,
+        limit,
+      }),
+    getNextPageParam: (lastPage) => lastPage.data?.nextCursor ?? undefined,
     enabled: Boolean(conversationId),
     staleTime: 1000 * 30,
     retry: 1,

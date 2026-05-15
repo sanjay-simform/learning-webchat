@@ -85,7 +85,7 @@ export const SignUp = () => {
         password: payload.password,
       });
       await setCryptoDecryptedPassword(cryptoData, payload.password);
-      navigate("/");
+      navigate("/chat");
     }
   };
 

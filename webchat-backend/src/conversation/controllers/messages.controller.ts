@@ -71,10 +71,12 @@ export class MessagesController {
         id: message.id,
         conversationId: message.conversationId,
         senderUserId: message.senderUserId,
+        status: message.status,
         cipherText: message.cipherText,
         iv: message.iv,
         authTag: message.authTag,
         createdAt: message.createdAt,
+        payload: message.payload,
       })),
       nextCursor:
         messages.length === limit ? messages[messages.length - 1].id : null,

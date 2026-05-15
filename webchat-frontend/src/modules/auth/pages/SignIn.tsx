@@ -32,6 +32,10 @@ export const SignIn = () => {
     formState: { errors },
   } = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
+    defaultValues: {
+      username: localStorage.getItem("username") || "",
+      password: "Sit@321#",
+    },
   });
 
   const onSubmit = async (data: SignInFormData) => {
@@ -70,8 +74,8 @@ export const SignIn = () => {
         response.data.user.cryptoData!,
         payload.password,
       );
-
-      navigate("/");
+      localStorage.setItem("username", response.data.user.username);
+      navigate("/chat");
     }
   };
 

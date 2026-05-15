@@ -1,14 +1,65 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ConversationSummaryDto } from "../../api-client/services/conversation/conversation.service.dto";
-import { useMessages } from "../../api-client/services/messages/messages.service";
 import type { MessageItemDto } from "../../api-client/services/messages/messages.service.dto";
 import type { AuthUser } from "../../types/auth";
-import type { Message } from "../../types/chat";
-import { decryptMessageWithConversationKey } from "../../utils/crypto-utils";
+import { MessageStatus, type Message } from "../../types/chat";
+import {
+  decryptMessageWithConversationKey,
+  decryptMediaWithConversationKey,
+} from "../../utils/crypto-utils";
+import { useInfiniteMessages } from "../../api-client/services/messages/messages.service";
+import { API_BASE_URL } from "../../api-client/api-client";
+import { decryptImage } from "../../utils/image-enc.util";
+
+/**
+ * Detect MIME type from magic bytes (file signatures)
+ */
+function detectMimeType(bytes: Uint8Array): string {
+  // JPEG
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
+  // PNG
+  if (
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  )
+    return "image/png";
+  // GIF
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46)
+    return "image/gif";
+  // WebP
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46)
+    return "image/webp";
+  // Default
+  return "image/jpeg";
+}
+
+/**
+ * Decrypt media from server and create blob URL
+ */
+async function decryptAndBlobifyMedia(
+  mediaUrl: string,
+  conversationKey: string,
+  iv: string,
+): Promise<string> {
+  // Fetch encrypted media
+  const response = await fetch(mediaUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch media: ${response.statusText}`);
+  }
+
+  const encryptedBuffer = await response.arrayBuffer();
+  const decimage = await decryptImage(encryptedBuffer, conversationKey, iv);
+  return URL.createObjectURL(decimage);
+}
 
 interface UseConversationHistoryMessagesResult {
   messages: Message[];
   isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  loadMore: () => Promise<unknown>;
 }
 
 function toReadableMessage(
@@ -17,6 +68,7 @@ function toReadableMessage(
   currentUser: AuthUser | null,
   peerUsername: string,
   content: string,
+  imgUrl?: string,
 ): Message {
   const isCurrentUser = item.senderUserId === currentUser?.id;
 
@@ -28,13 +80,15 @@ function toReadableMessage(
       ? (currentUser?.username ?? "You")
       : peerUsername,
     content,
+    imgUrl,
     encryptedPayload: {
       cipherText: item.cipherText,
       iv: item.iv,
       authTag: item.authTag,
     },
     timestamp: new Date(item.createdAt),
-    status: isCurrentUser ? "delivered" : undefined,
+    status:
+      item.status ?? (isCurrentUser ? MessageStatus.DELIVERED : undefined),
   };
 }
 
@@ -44,20 +98,29 @@ export function useConversationHistoryMessages(
   currentUser: AuthUser | null,
 ): UseConversationHistoryMessagesResult {
   const [messages, setMessages] = useState<Message[]>([]);
-  const messagesQuery = useMessages(conversation?.id ?? "", { limit: 50 });
+  const [isHydratingMessages, setIsHydratingMessages] = useState(false);
+  const hydrationRequestRef = useRef(0);
+  const messagesQuery = useInfiniteMessages(conversation?.id ?? "", {
+    limit: 50,
+  });
 
   useEffect(() => {
     if (!conversation) {
       setMessages([]);
+      setIsHydratingMessages(false);
       return;
     }
 
-    const items = messagesQuery.data?.data?.items;
-    if (!conversationKey || !items) {
+    const pages = messagesQuery.data?.pages ?? [];
+    const items = pages.flatMap((page) => page.data?.items ?? []);
+    if (!conversationKey || items.length === 0) {
       return;
     }
 
     let cancelled = false;
+    const requestId = ++hydrationRequestRef.current;
+
+    setIsHydratingMessages(true);
 
     void (async () => {
       try {
@@ -72,13 +135,25 @@ export function useConversationHistoryMessages(
                 authTag: item.authTag,
               },
             );
-
+            let imageUrl: string | undefined;
+            if (item?.payload?.mediaUrl) {
+              try {
+                imageUrl = await decryptAndBlobifyMedia(
+                  API_BASE_URL + item.payload.mediaUrl,
+                  conversationKey,
+                  item?.payload.iv,
+                );
+              } catch (error) {
+                console.error("Failed to decrypt media:", error);
+              }
+            }
             return toReadableMessage(
               item,
               conversation.id,
               currentUser,
               conversation.peer.username,
               content,
+              imageUrl,
             );
           }),
         );
@@ -90,25 +165,29 @@ export function useConversationHistoryMessages(
         if (!cancelled) {
           setMessages([]);
         }
+      } finally {
+        if (!cancelled && hydrationRequestRef.current === requestId) {
+          setIsHydratingMessages(false);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [
-    conversation,
-    conversationKey,
-    currentUser,
-    messagesQuery.data?.data?.items,
-  ]);
+  }, [conversation, conversationKey, currentUser, messagesQuery.data?.pages]);
 
   return {
     messages,
     isLoading:
       !conversation ||
       !conversationKey ||
-      messagesQuery.isLoading ||
-      messagesQuery.isFetching,
+      (messagesQuery.isLoading && messages.length === 0) ||
+      (isHydratingMessages && messages.length === 0),
+    isLoadingMore:
+      messagesQuery.isFetchingNextPage ||
+      (isHydratingMessages && messages.length > 0),
+    hasMore: Boolean(messagesQuery.hasNextPage),
+    loadMore: messagesQuery.fetchNextPage,
   };
 }

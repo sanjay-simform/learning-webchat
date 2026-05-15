@@ -5,16 +5,29 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import type IORedis from 'ioredis';
 import {
   REDIS_CONNECTION,
   REDIS_SUBSCRIBER_CONNECTION,
 } from 'src/redis/constants';
-import { CHAT_ACK_CHANNEL, CHAT_OUTBOUND_CHANNEL } from '../constants';
+import {
+  MessageEntity,
+  MessageStatus,
+} from 'src/database/schemas/messages.schema';
+import {
+  CHAT_ACK_CHANNEL,
+  CHAT_DELIVERED_CHANNEL,
+  CHAT_OUTBOUND_CHANNEL,
+  CHAT_SEEN_CHANNEL,
+} from '../constants';
 import {
   MessageDeliveryAckEvent,
+  MessageDeliveredReceiptEvent,
+  MessageSeenReceiptEvent,
   OutboundChatMessageEvent,
 } from '../types/chat-events';
+import { In, Repository } from 'typeorm';
 import { ConnectionRegistryService } from './connection-registry.service';
 
 @Injectable()
@@ -30,10 +43,12 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly connectionRegistry: ConnectionRegistryService,
-    @Inject(REDIS_CONNECTION)
+    @Inject(REDIS_CONNECTION as string)
     private readonly commandRedis: IORedis,
-    @Inject(REDIS_SUBSCRIBER_CONNECTION)
+    @Inject(REDIS_SUBSCRIBER_CONNECTION as string)
     private readonly subscriberRedis: IORedis,
+    @InjectRepository(MessageEntity)
+    private readonly messageRepository: Repository<MessageEntity>,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -41,6 +56,8 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
     await this.subscriberRedis.subscribe(
       CHAT_OUTBOUND_CHANNEL,
       CHAT_ACK_CHANNEL,
+      CHAT_DELIVERED_CHANNEL,
+      CHAT_SEEN_CHANNEL,
     );
   }
 
@@ -49,6 +66,8 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
     await this.subscriberRedis.unsubscribe(
       CHAT_OUTBOUND_CHANNEL,
       CHAT_ACK_CHANNEL,
+      CHAT_DELIVERED_CHANNEL,
+      CHAT_SEEN_CHANNEL,
     );
   }
 
@@ -62,7 +81,17 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (channel === CHAT_ACK_CHANNEL) {
-      this.handleDeliveryAck(rawMessage);
+      void this.handleDeliveryAck(rawMessage);
+      return;
+    }
+
+    if (channel === CHAT_DELIVERED_CHANNEL) {
+      await this.handleDeliveredReceipt(rawMessage);
+      return;
+    }
+
+    if (channel === CHAT_SEEN_CHANNEL) {
+      await this.handleSeenReceipt(rawMessage);
     }
   }
 
@@ -82,9 +111,19 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
         conversationId: outboundEvent.conversationId,
         senderUserId: outboundEvent.senderUserId,
         recipientUserId: outboundEvent.recipientUserId,
-        status: deliveredSockets > 0 ? 'delivered' : 'stored',
+        status: MessageStatus.DELIVERED,
         ackAt: new Date().toISOString(),
+        payload: outboundEvent.payload,
       };
+
+      const persistedStatus = await this.persistMessageStatus(
+        deliveryAck.messageId,
+        MessageStatus.DELIVERED,
+      );
+
+      if (persistedStatus === MessageStatus.SEEN) {
+        return;
+      }
 
       await this.commandRedis.publish(
         CHAT_ACK_CHANNEL,
@@ -97,9 +136,21 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private handleDeliveryAck(rawMessage: string): void {
+  private async handleDeliveryAck(rawMessage: string): Promise<void> {
     try {
       const ackEvent = JSON.parse(rawMessage) as MessageDeliveryAckEvent;
+
+      if (ackEvent.status === MessageStatus.DELIVERED) {
+        const persistedStatus = await this.persistMessageStatus(
+          ackEvent.messageId,
+          MessageStatus.DELIVERED,
+        );
+
+        if (persistedStatus === MessageStatus.SEEN) {
+          return;
+        }
+      }
+
       this.connectionRegistry.emitToUser(
         ackEvent.senderUserId,
         'message_delivery',
@@ -109,6 +160,144 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(
         `Failed handling delivery ack event: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+
+  private async handleDeliveredReceipt(rawMessage: string): Promise<void> {
+    try {
+      const deliveredReceipt = JSON.parse(
+        rawMessage,
+      ) as MessageDeliveredReceiptEvent;
+      const uniqueMessageIds = [...new Set(deliveredReceipt.messageIds)];
+
+      if (uniqueMessageIds.length === 0) {
+        return;
+      }
+
+      const messages = await this.messageRepository.findBy({
+        id: In(uniqueMessageIds),
+      });
+
+      for (const message of messages) {
+        if (message.senderUserId === deliveredReceipt.recipientUserId) {
+          continue;
+        }
+
+        if (
+          message.status === MessageStatus.DELIVERED ||
+          message.status === MessageStatus.SEEN
+        ) {
+          continue;
+        }
+
+        await this.persistMessageStatus(message.id, MessageStatus.DELIVERED);
+
+        this.connectionRegistry.emitToUser(
+          message.senderUserId,
+          'message_delivery',
+          {
+            messageId: message.id,
+            clientMsgId: null,
+            conversationId: message.conversationId,
+            senderUserId: message.senderUserId,
+            recipientUserId: deliveredReceipt.recipientUserId,
+            status: MessageStatus.DELIVERED,
+            ackAt: deliveredReceipt.deliveredAt,
+            payload: message.payload,
+          } satisfies MessageDeliveryAckEvent,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed handling delivered receipt event: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async handleSeenReceipt(rawMessage: string): Promise<void> {
+    try {
+      const seenReceipt = JSON.parse(rawMessage) as MessageSeenReceiptEvent;
+      const uniqueMessageIds = [...new Set(seenReceipt.messageIds)];
+
+      if (uniqueMessageIds.length === 0) {
+        return;
+      }
+
+      const messages = await this.messageRepository.findBy({
+        id: In(uniqueMessageIds),
+      });
+
+      for (const message of messages) {
+        if (message.senderUserId === seenReceipt.recipientUserId) {
+          continue;
+        }
+
+        if (message.status !== MessageStatus.SEEN) {
+          await this.persistMessageStatus(message.id, MessageStatus.SEEN);
+        }
+
+        this.connectionRegistry.emitToUser(
+          message.senderUserId,
+          'message_delivery',
+          {
+            messageId: message.id,
+            clientMsgId: null,
+            conversationId: message.conversationId,
+            senderUserId: message.senderUserId,
+            recipientUserId: seenReceipt.recipientUserId,
+            status: MessageStatus.SEEN,
+            ackAt: seenReceipt.seenAt,
+            payload: message.payload,
+          } satisfies MessageDeliveryAckEvent,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed handling seen receipt event: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async persistMessageStatus(
+    messageId: string,
+    status: MessageStatus,
+  ): Promise<MessageStatus | null> {
+    try {
+      const message = await this.messageRepository.findOneBy({ id: messageId });
+      if (!message) {
+        this.logger.warn(
+          `Message ${messageId} was not found while updating status ${status}`,
+        );
+        return null;
+      }
+
+      if (status === MessageStatus.DELIVERED) {
+        if (message.status === MessageStatus.SEEN) {
+          return MessageStatus.SEEN;
+        }
+
+        if (message.status !== MessageStatus.DELIVERED) {
+          await this.messageRepository.update(messageId, { status });
+        }
+
+        return MessageStatus.DELIVERED;
+      }
+
+      if (status === MessageStatus.SEEN) {
+        if (message.status !== MessageStatus.SEEN) {
+          await this.messageRepository.update(messageId, { status });
+        }
+
+        return MessageStatus.SEEN;
+      }
+
+      await this.messageRepository.update(messageId, { status });
+      return status;
+    } catch (error) {
+      this.logger.error(
+        `Failed to persist message ${messageId} status ${status}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
     }
   }
 }

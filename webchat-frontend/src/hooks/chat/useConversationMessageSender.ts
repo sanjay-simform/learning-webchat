@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "../../context/SocketContext";
 import type { AuthUser } from "../../types/auth";
-import type { Message } from "../../types/chat";
+import {
+  MessageStatus,
+  MessageType,
+  type Message,
+  type MessagePayload,
+} from "../../types/chat";
 import { encryptMessageWithConversationKey } from "../../utils/crypto-utils";
 import type { MessageQueuedEvent } from "./chat-event.types";
 
@@ -21,7 +26,10 @@ interface PendingMessageAck {
 }
 
 interface UseConversationMessageSenderResult {
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (
+    content: string,
+    payload: Partial<MessagePayload>,
+  ) => Promise<void>;
   isSending: boolean;
 }
 
@@ -76,7 +84,7 @@ export function useConversationMessageSender({
   }, [conversationId, onEvent, onQueued]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, payload: Partial<MessagePayload>) => {
       if (!conversationId || !conversationKey || !currentUser) {
         throw new Error("Conversation is not ready yet");
       }
@@ -99,8 +107,12 @@ export function useConversationMessageSender({
         content,
         encryptedPayload,
         timestamp: new Date(),
-        status: "pending",
+        status: MessageStatus.PENDING,
         clientMsgId,
+        payload: {
+          type: payload.type ?? MessageType.TEXT,
+          ...payload,
+        },
       });
 
       setIsSending(true);
@@ -124,10 +136,18 @@ export function useConversationMessageSender({
           conversationId,
           clientMsgId,
           ...encryptedPayload,
+          payload: {
+            type: payload.type ?? MessageType.TEXT,
+            ...payload,
+          },
         });
 
         await ackPromise;
       } catch (error) {
+        console.log(
+          "🚀 ~ useConversationMessageSender ~ sendMessage ~ error:",
+          error,
+        );
         const pendingAck = pendingAcksRef.current.get(clientMsgId);
         if (pendingAck) {
           window.clearTimeout(pendingAck.timeoutId);

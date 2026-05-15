@@ -299,4 +299,8 @@
     background-color: rgb(251 113 133 / 0.2);
     color: var(--danger);
   }
+
+  .text-accent-cyan {
+    color: var(--accent-cyan);
+  }
 }

@@ -141,13 +141,19 @@ export const ChatPage = () => {
 
         {/* Chat Panel */}
         <ChatPanel
+          conversationMessageKey={
+            conversationMessages.getEncryptionKeyForMessage
+          }
           chat={selectedChat}
           messages={conversationMessages.messages}
           isLoading={
             conversationMessages.isLoading || conversationsQuery.isLoading
           }
+          isLoadingMoreMessages={conversationMessages.isLoadingMoreMessages}
+          hasMoreMessages={conversationMessages.hasMoreMessages}
           currentUserId={user?.id}
           onSendMessage={conversationMessages.sendMessage}
+          onLoadMoreMessages={conversationMessages.loadMoreMessages}
         />
       </div>
 

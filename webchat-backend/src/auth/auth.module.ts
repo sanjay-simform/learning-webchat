@@ -10,31 +10,24 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([
-      {
-        name: 'signup',
-        ttl: 3600000, // 1 hour in milliseconds
-        limit: 10,
-      },
-      {
-        name: 'login',
-        ttl: 60000, // 1 minute in milliseconds
-        limit: 10,
-      },
-    ]),
+    // ThrottlerModule.forRoot([
+    //   {
+    //     name: 'signup',
+    //     ttl: 3600000, // 1 hour in milliseconds
+    //     limit: 10,
+    //   },
+    //   // {
+    //   //   name: 'login',
+    //   //   ttl: 60000, // 1 minute in milliseconds
+    //   //   limit: 10,
+    //   // },
+    // ]),
     UserModule,
     SharedModule,
     RedisModule,
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    JwtAuthGuard,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
+  providers: [AuthService, JwtAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

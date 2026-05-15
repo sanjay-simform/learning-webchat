@@ -1,4 +1,8 @@
-import type { Message } from "../../types/chat";
+import {
+  MessageStatus,
+  type Message,
+  type MessagePayload,
+} from "../../types/chat";
 
 export type ConversationMessagePatch = {
   clientMsgId?: string;
@@ -11,6 +15,46 @@ export type ConversationMessageAction =
   | { type: "hydrate"; messages: Message[] }
   | { type: "upsert"; message: Message }
   | { type: "patch"; patch: ConversationMessagePatch };
+
+const MESSAGE_STATUS_RANK: Record<MessageStatus, number> = {
+  [MessageStatus.PENDING]: 0,
+  [MessageStatus.FAILED]: 1,
+  [MessageStatus.QUEUED]: 2,
+  [MessageStatus.DELIVERED]: 3,
+  [MessageStatus.SEEN]: 4,
+};
+
+function resolveMessageStatus(
+  currentStatus: MessageStatus | undefined,
+  nextStatus: MessageStatus | undefined,
+): MessageStatus | undefined {
+  if (!nextStatus) {
+    return currentStatus;
+  }
+
+  if (!currentStatus) {
+    return nextStatus;
+  }
+
+  return MESSAGE_STATUS_RANK[nextStatus] >= MESSAGE_STATUS_RANK[currentStatus]
+    ? nextStatus
+    : currentStatus;
+}
+
+function mergeMessage(
+  currentMessage: Message,
+  updates: Partial<Message>,
+): Message {
+  const mergedMessage = {
+    ...currentMessage,
+    ...updates,
+  };
+
+  return {
+    ...mergedMessage,
+    status: resolveMessageStatus(currentMessage.status, updates.status),
+  };
+}
 
 function messageMatchesPatch(
   message: Message,
@@ -65,10 +109,7 @@ function upsertMessage(messages: Message[], nextMessage: Message): Message[] {
   }
 
   const updatedMessages = [...messages];
-  updatedMessages[index] = {
-    ...updatedMessages[index],
-    ...nextMessage,
-  };
+  updatedMessages[index] = mergeMessage(updatedMessages[index], nextMessage);
 
   return sortMessages(updatedMessages);
 }
@@ -86,10 +127,7 @@ function patchMessage(
   }
 
   const updatedMessages = [...messages];
-  updatedMessages[index] = {
-    ...updatedMessages[index],
-    ...patch.updates,
-  };
+  updatedMessages[index] = mergeMessage(updatedMessages[index], patch.updates);
 
   return sortMessages(updatedMessages);
 }
@@ -118,7 +156,7 @@ export function createQueuedPatch(
   return {
     clientMsgId,
     updates: {
-      status: "queued",
+      status: MessageStatus.QUEUED,
     },
   };
 }
@@ -126,7 +164,9 @@ export function createQueuedPatch(
 export function createDeliveryPatch(params: {
   clientMsgId?: string | null;
   messageId: string;
-  status: "delivered" | "stored";
+  status: MessageStatus;
+  payload?: MessagePayload;
+  imgUrl?: string;
 }): ConversationMessagePatch {
   return {
     clientMsgId: params.clientMsgId ?? undefined,
@@ -134,6 +174,8 @@ export function createDeliveryPatch(params: {
     updates: {
       id: params.messageId,
       status: params.status,
+      payload: params.payload,
+      imgUrl: params.imgUrl,
     },
   };
 }
@@ -144,7 +186,7 @@ export function createFailedPatch(
   return {
     clientMsgId,
     updates: {
-      status: "failed",
+      status: MessageStatus.FAILED,
     },
   };
 }

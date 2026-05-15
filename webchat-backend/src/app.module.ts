@@ -9,9 +9,20 @@ import { SharedModule } from './shared/shared.module';
 import { ConversationModule } from './conversation/conversation.module';
 import { SearchModule } from './search/search.module';
 import { ChatModule } from './chat/chat.module';
+import { UploadModule } from './upload/upload.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import {
+  MULTER_DESTINATION_FOLDER,
+  UPLOAD_SERVE_ROOT,
+} from './upload/constant/multer.contant';
 
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', MULTER_DESTINATION_FOLDER),
+      serveRoot: UPLOAD_SERVE_ROOT,
+    }),
     DatabaseModule,
     RedisModule,
     SharedModule,
@@ -20,6 +31,7 @@ import { ChatModule } from './chat/chat.module';
     ConversationModule,
     SearchModule,
     ChatModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

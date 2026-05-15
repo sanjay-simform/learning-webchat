@@ -1,9 +1,10 @@
-import { useMemo } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useMemo, useRef } from "react";
+import { motion } from "motion/react";
 import type { Chat } from "../../../types/chat";
 import { ChatListItem } from "./ChatListItem";
 import { LoadingSpinner } from "../../../components/LoadingSpinner";
 import type { ConversationSummaryDto } from "../../../api-client/services/conversation/conversation.service.dto";
+import { useListVirtualizer } from "../../../hooks/useListVirtualizer.ts";
 
 interface ChatListSidebarProps {
   conversations: ConversationSummaryDto[];
@@ -22,6 +23,10 @@ export const ChatListSidebar = ({
   searchQuery,
   isLoading,
 }: ChatListSidebarProps) => {
+  "use no memo";
+
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+
   const filteredConversations = useMemo(() => {
     if (searchQuery.trim() === "") {
       return conversations;
@@ -34,6 +39,16 @@ export const ChatListSidebar = ({
         conversation.peer.id.toLowerCase().includes(query),
     );
   }, [conversations, searchQuery]);
+
+  const conversationVirtualizer = useListVirtualizer({
+    count: filteredConversations.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 88,
+    overscan: 8,
+    getItemKey: (index) => filteredConversations[index]?.id ?? index,
+  });
+
+  const virtualItems = conversationVirtualizer.getVirtualItems();
 
   return (
     <div className="flex flex-col h-full bg-sidebar border-r border-obsidian-500 border-opacity-40">
@@ -49,7 +64,7 @@ export const ChatListSidebar = ({
       </div>
 
       {/* Chat List */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollParentRef} className="flex-1 overflow-y-auto px-2 py-2">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <LoadingSpinner />
@@ -81,28 +96,33 @@ export const ChatListSidebar = ({
             )}
           </motion.div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="p-2 space-y-1"
-          >
-            <AnimatePresence>
-              {filteredConversations.map((conversation) => (
-                <motion.div
-                  key={conversation.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChatListItem
-                    conversation={conversation}
-                    isSelected={selectedChat?.id === conversation.id}
-                    onClick={() => onSelectConversation(conversation)}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <div
+              className="relative w-full"
+              style={{ height: `${conversationVirtualizer.getTotalSize()}px` }}
+            >
+              {virtualItems.map((virtualItem) => {
+                const conversation = filteredConversations[virtualItem.index];
+
+                return (
+                  <div
+                    key={virtualItem.key}
+                    ref={conversationVirtualizer.measureElement}
+                    data-index={virtualItem.index}
+                    className="absolute left-0 top-0 w-full"
+                    style={{
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    <ChatListItem
+                      conversation={conversation}
+                      isSelected={selectedChat?.id === conversation.id}
+                      onClick={() => onSelectConversation(conversation)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </motion.div>
         )}
       </div>

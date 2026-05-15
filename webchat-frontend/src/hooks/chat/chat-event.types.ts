@@ -1,3 +1,10 @@
+import type { MessagePayload, MessageStatus } from "../../types/chat";
+
+export type MessageDeliveryStatus =
+  | MessageStatus.QUEUED
+  | MessageStatus.DELIVERED
+  | MessageStatus.SEEN;
+
 export interface OutboundChatMessageEvent {
   messageId: string;
   clientMsgId: string | null;
@@ -8,11 +15,12 @@ export interface OutboundChatMessageEvent {
   iv: string;
   authTag: string;
   createdAt: string;
+  payload: MessagePayload;
 }
 
 export interface MessageQueuedEvent {
   clientMsgId: string | null;
-  status: "queued";
+  status: MessageStatus.QUEUED;
 }
 
 export interface MessageDeliveryAckEvent {
@@ -21,6 +29,7 @@ export interface MessageDeliveryAckEvent {
   conversationId: string;
   senderUserId: string;
   recipientUserId: string;
-  status: "delivered" | "stored";
+  status: MessageDeliveryStatus;
   ackAt: string;
+  payload?: MessagePayload;
 }

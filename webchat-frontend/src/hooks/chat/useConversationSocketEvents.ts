@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { useSocket } from "../../context/SocketContext";
 import type { AuthUser } from "../../types/auth";
-import type { Message } from "../../types/chat";
+import { MessageStatus, type Message } from "../../types/chat";
 import { decryptMessageWithConversationKey } from "../../utils/crypto-utils";
+import { decryptImage } from "../../utils/image-enc.util";
+import { API_BASE_URL } from "../../api-client/api-client";
 import type {
   MessageDeliveryAckEvent,
   OutboundChatMessageEvent,
@@ -51,6 +53,30 @@ export function useConversationSocketEvents({
           );
 
           const isCurrentUser = event.senderUserId === currentUser?.id;
+
+          // Decrypt image if payload contains media
+          let imgUrl: string | undefined;
+          const eventPayload = event.payload;
+          if (eventPayload?.mediaUrl && eventPayload.iv) {
+            try {
+              const encryptedImageResponse = await fetch(
+                API_BASE_URL + eventPayload.mediaUrl,
+              );
+              if (encryptedImageResponse.ok) {
+                const encryptedBuffer =
+                  await encryptedImageResponse.arrayBuffer();
+                const decryptedImageBlob = await decryptImage(
+                  encryptedBuffer,
+                  conversationKey,
+                  eventPayload.iv,
+                );
+                imgUrl = URL.createObjectURL(decryptedImageBlob);
+              }
+            } catch (error) {
+              console.error("Failed to decrypt incoming message media:", error);
+            }
+          }
+
           onIncomingMessage({
             id: event.messageId,
             conversationId: event.conversationId,
@@ -66,6 +92,9 @@ export function useConversationSocketEvents({
             },
             timestamp: new Date(event.createdAt),
             clientMsgId: event.clientMsgId ?? undefined,
+            status: MessageStatus.DELIVERED,
+            payload: event.payload,
+            imgUrl,
           });
         } catch {
           // Ignore malformed payloads.

@@ -16,7 +16,6 @@ export const ChatDetailPage = () => {
     ? (conversations.find((item) => item.id === chatId) ?? null)
     : null;
   const conversationMessages = useConversationMessages(conversation);
-
   const handleBackClick = () => {
     navigate("/chat");
   };
@@ -102,11 +101,11 @@ export const ChatDetailPage = () => {
               <h2 className="text-sm font-semibold text-primary truncate">
                 {conversation.peer.username}
               </h2>
-              <p className="text-xs text-text-secondary">
+              {/* <p className="text-xs text-text-secondary">
                 {conversationMessages.isSending
                   ? "Sending..."
                   : "Encrypted chat"}
-              </p>
+              </p> */}
             </div>
           </div>
 
@@ -150,10 +149,16 @@ export const ChatDetailPage = () => {
             userId: conversation.peer.id,
             username: conversation.peer.username,
           }}
+          conversationMessageKey={
+            conversationMessages.getEncryptionKeyForMessage
+          }
           messages={conversationMessages.messages}
           isLoading={conversationMessages.isLoading}
+          isLoadingMoreMessages={conversationMessages.isLoadingMoreMessages}
+          hasMoreMessages={conversationMessages.hasMoreMessages}
           currentUserId={user?.id}
           onSendMessage={conversationMessages.sendMessage}
+          onLoadMoreMessages={conversationMessages.loadMoreMessages}
         />
       </div>
     </MainLayout>

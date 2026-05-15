@@ -12,8 +12,16 @@ import type IORedis from 'ioredis';
 import { REDIS_CONNECTION } from 'src/redis/constants';
 import { JwtService } from 'src/shared/services/jwt.service';
 import WebSocket from 'ws';
-import { CHAT_STREAM_KEY } from './constants';
-import { SendMessageDto } from './dtos/send-message.dto';
+import {
+  CHAT_DELIVERED_CHANNEL,
+  CHAT_SEEN_CHANNEL,
+  CHAT_STREAM_KEY,
+} from './constants';
+import {
+  MarkMessagesDeliveredDto,
+  MarkMessagesSeenDto,
+  SendMessageDto,
+} from './dtos';
 import { ConnectionRegistryService } from './services/connection-registry.service';
 
 interface AuthenticatedSocket extends WebSocket {
@@ -115,6 +123,8 @@ export class ChatGateway {
         dto.authTag,
         'clientMsgId',
         dto.clientMsgId ?? '',
+        'payload',
+        JSON.stringify(dto.payload),
       );
 
       return {
@@ -129,6 +139,88 @@ export class ChatGateway {
         `Failed to enqueue chat message: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw new WsException('Failed to queue message');
+    }
+  }
+
+  @SubscribeMessage('mark_messages_seen')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async handleMarkMessagesSeen(
+    @ConnectedSocket() client: WebSocket,
+    @MessageBody() dto: MarkMessagesSeenDto,
+  ): Promise<void> {
+    const authenticatedClient = client as AuthenticatedSocket;
+    const recipientUserId = authenticatedClient.userId;
+
+    if (!recipientUserId) {
+      throw new WsException('Unauthorized websocket session');
+    }
+
+    const messageIds = [...new Set(dto.messageIds)];
+    if (messageIds.length === 0) {
+      return;
+    }
+
+    try {
+      await this.commandRedis.publish(
+        CHAT_SEEN_CHANNEL,
+        JSON.stringify({
+          messageIds,
+          recipientUserId,
+          seenAt: new Date().toISOString(),
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue seen receipt: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new WsException('Failed to mark messages as seen');
+    }
+  }
+
+  @SubscribeMessage('mark_messages_delivered')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async handleMarkMessagesDelivered(
+    @ConnectedSocket() client: WebSocket,
+    @MessageBody() dto: MarkMessagesDeliveredDto,
+  ): Promise<void> {
+    const authenticatedClient = client as AuthenticatedSocket;
+    const recipientUserId = authenticatedClient.userId;
+
+    if (!recipientUserId) {
+      throw new WsException('Unauthorized websocket session');
+    }
+
+    const messageIds = [...new Set(dto.messageIds)];
+    if (messageIds.length === 0) {
+      return;
+    }
+
+    try {
+      await this.commandRedis.publish(
+        CHAT_DELIVERED_CHANNEL,
+        JSON.stringify({
+          messageIds,
+          recipientUserId,
+          deliveredAt: new Date().toISOString(),
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue delivered receipt: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new WsException('Failed to mark messages as delivered');
     }
   }
 

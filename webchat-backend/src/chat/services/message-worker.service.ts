@@ -9,7 +9,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type IORedis from 'ioredis';
 import { Repository } from 'typeorm';
 import { ConversationMember } from 'src/database/schemas/conversation-member.schema';
-import { MessageEntity } from 'src/database/schemas/messages.schema';
+import {
+  MessageEntity,
+  MessagePayload,
+  MessageStatus,
+} from 'src/database/schemas/messages.schema';
 import {
   REDIS_CONNECTION,
   REDIS_PUBLISHER_CONNECTION,
@@ -33,6 +37,7 @@ interface ParsedStreamMessage {
   iv: string;
   authTag: string;
   clientMsgId: string | null;
+  messagePayload: MessagePayload;
 }
 
 type StreamEntry = [streamId: string, values: string[]];
@@ -51,9 +56,9 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
   private consumePromise: Promise<void> | null = null;
 
   constructor(
-    @Inject(REDIS_PUBLISHER_CONNECTION)
+    @Inject(REDIS_PUBLISHER_CONNECTION as string)
     private readonly streamRedis: IORedis,
-    @Inject(REDIS_CONNECTION)
+    @Inject(REDIS_CONNECTION as string)
     private readonly commandRedis: IORedis,
     @InjectRepository(MessageEntity)
     private readonly messageRepository: Repository<MessageEntity>,
@@ -146,6 +151,10 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
           CHAT_STREAM_KEY,
           '>',
         )) as XReadGroupResponse;
+        console.log(
+          '🚀 ~ MessageWorkerService ~ consumeLoop ~ response:',
+          JSON.stringify(response),
+        );
 
         if (!response || response.length === 0) {
           continue;
@@ -163,6 +172,10 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processEntries(entries: StreamEntry[]): Promise<void> {
+    console.log(
+      '🚀 ~ MessageWorkerService ~ processEntries ~ entries:',
+      entries,
+    );
     for (const entry of entries) {
       await this.processEntry(entry);
     }
@@ -170,6 +183,7 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
 
   private async processEntry(entry: StreamEntry): Promise<void> {
     const payload = this.parseStreamEntry(entry);
+    console.log('🚀 ~ MessageWorkerService ~ processEntry ~ payload:', payload);
     if (!payload) {
       await this.ackEntry(entry[0]);
       return;
@@ -218,9 +232,11 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
         this.messageRepository.create({
           conversationId: payload.conversationId,
           senderUserId: payload.senderUserId,
-          cipherText: payload.cipherText,
-          iv: payload.iv,
-          authTag: payload.authTag,
+          status: MessageStatus.QUEUED,
+          cipherText: payload?.cipherText ?? '',
+          iv: payload?.iv ?? '',
+          authTag: payload?.authTag ?? '',
+          payload: payload?.messagePayload ?? {},
         }),
       );
 
@@ -234,6 +250,7 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
         iv: savedMessage.iv,
         authTag: savedMessage.authTag,
         createdAt: savedMessage.createdAt.toISOString(),
+        payload: savedMessage.payload,
       };
 
       await this.commandRedis.publish(
@@ -258,13 +275,14 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
     const cipherText = fields.cipherText;
     const iv = fields.iv;
     const authTag = fields.authTag;
+    const messagePayload = JSON.parse(fields.payload) as MessagePayload;
 
-    if (!conversationId || !senderUserId || !cipherText || !iv || !authTag) {
-      this.logger.warn(
-        `Invalid stream message ${streamId}; required fields missing`,
-      );
-      return null;
-    }
+    // if (!conversationId || !senderUserId || !cipherText || !iv || !authTag) {
+    //   this.logger.warn(
+    //     `Invalid stream message ${streamId}; required fields missing`,
+    //   );
+    //   return null;
+    // }
 
     const clientMsgId = fields.clientMsgId || null;
 
@@ -276,6 +294,7 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
       iv,
       authTag,
       clientMsgId,
+      messagePayload,
     };
   }
 

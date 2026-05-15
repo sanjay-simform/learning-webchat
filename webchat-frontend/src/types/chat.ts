@@ -9,7 +9,29 @@ export interface Chat {
   avatar?: string;
   isOnline?: boolean;
 }
-
+export enum MessageStatus {
+  PENDING = "pending",
+  QUEUED = "queued",
+  DELIVERED = "delivered",
+  SEEN = "seen",
+  FAILED = "failed",
+}
+export enum MessageType {
+  TEXT = "text",
+  IMAGE = "image",
+}
+export interface MessagePayload {
+  type: MessageType;
+  mediaUrl?: string;
+  previewUrl?: string;
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+  width?: number;
+  height?: number;
+  authTag?: string;
+  iv?: string;
+}
 export interface Message {
   id: string;
   chatId?: string;
@@ -22,10 +44,12 @@ export interface Message {
     iv: string;
     authTag: string;
   };
+  imgUrl?: string;
   timestamp: Date;
   isRead?: boolean;
-  status?: "pending" | "queued" | "delivered" | "stored" | "failed";
+  status?: MessageStatus;
   clientMsgId?: string;
+  payload: MessagePayload;
 }
 
 export interface ChatContextType {
