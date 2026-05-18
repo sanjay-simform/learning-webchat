@@ -3,37 +3,10 @@ import type { ConversationSummaryDto } from "../../api-client/services/conversat
 import type { MessageItemDto } from "../../api-client/services/messages/messages.service.dto";
 import type { AuthUser } from "../../types/auth";
 import { MessageStatus, type Message } from "../../types/chat";
-import {
-  decryptMessageWithConversationKey,
-  decryptMediaWithConversationKey,
-} from "../../utils/crypto-utils";
+import { decryptMessageWithConversationKey } from "../../utils/crypto-utils";
 import { useInfiniteMessages } from "../../api-client/services/messages/messages.service";
-import { API_BASE_URL } from "../../api-client/api-client";
+import { UPLOAD_BASE_URL } from "../../api-client/api-client";
 import { decryptImage } from "../../utils/image-enc.util";
-
-/**
- * Detect MIME type from magic bytes (file signatures)
- */
-function detectMimeType(bytes: Uint8Array): string {
-  // JPEG
-  if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
-  // PNG
-  if (
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47
-  )
-    return "image/png";
-  // GIF
-  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46)
-    return "image/gif";
-  // WebP
-  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46)
-    return "image/webp";
-  // Default
-  return "image/jpeg";
-}
 
 /**
  * Decrypt media from server and create blob URL
@@ -89,6 +62,7 @@ function toReadableMessage(
     timestamp: new Date(item.createdAt),
     status:
       item.status ?? (isCurrentUser ? MessageStatus.DELIVERED : undefined),
+    payload: item.payload,
   };
 }
 
@@ -139,7 +113,7 @@ export function useConversationHistoryMessages(
             if (item?.payload?.mediaUrl) {
               try {
                 imageUrl = await decryptAndBlobifyMedia(
-                  API_BASE_URL + item.payload.mediaUrl,
+                  UPLOAD_BASE_URL + item.payload.mediaUrl,
                   conversationKey,
                   item?.payload.iv,
                 );

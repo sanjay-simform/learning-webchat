@@ -4,6 +4,9 @@ import { clearAuthSession } from "../utils/auth-session";
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
+export const UPLOAD_BASE_URL =
+  import.meta.env.VITE_UPLOAD_URL || "http://localhost:3000/uploads";
+
 // add the cors
 
 export const apiClient = axios.create({

@@ -1,6 +1,10 @@
 export interface ConversationPeerDto {
   id: string;
   username: string;
+  userProfile: {
+    avatarUrl: string | null;
+    displayName: string | null;
+  };
 }
 
 export interface ConversationSummaryDto {

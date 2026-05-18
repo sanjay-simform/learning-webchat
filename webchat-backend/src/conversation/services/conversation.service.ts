@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Conversation } from 'src/database/schemas/conversation.schema';
 import { ConversationMember } from 'src/database/schemas/conversation-member.schema';
 import { User } from 'src/database/schemas/user.schema';
@@ -14,24 +14,26 @@ import {
 } from '../dtos/conversation-summary.dto';
 import { ConversationCryptoService } from './conversation-crypto.service';
 import { DataSource } from 'typeorm';
+import { UserProfile } from 'src/database/schemas/user-profile.schema';
+import { ConnectionRegistryService } from 'src/chat/services/connection-registry.service';
 
 interface ConversationUserProjection {
   id: string;
   username: string;
   rsa_public_key: string;
+  profile: UserProfile | null;
 }
 
 @Injectable()
 export class ConversationService {
   constructor(
-    @InjectRepository(Conversation)
-    private conversationRepository: Repository<Conversation>,
     @InjectRepository(ConversationMember)
     private conversationMemberRepository: Repository<ConversationMember>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private conversationCryptoService: ConversationCryptoService,
     private dataSource: DataSource,
+    private connectionRegistry: ConnectionRegistryService,
   ) {}
 
   async inviteUserById(
@@ -141,7 +143,31 @@ export class ConversationService {
 
       await queryRunner.manager.save(members);
       await queryRunner.commitTransaction();
-
+      const membership = await this.conversationMemberRepository.findOne({
+        where: {
+          conversationId: conversation.id,
+          userId: Not(currentUser.id),
+        },
+        relations: {
+          conversation: {
+            members: {
+              user: {
+                profile: true,
+              },
+            },
+          },
+        },
+        order: {
+          conversation: {
+            createdAt: 'DESC',
+          },
+        },
+      });
+      this.connectionRegistry.emitToUser(
+        invitedUser.id,
+        'conversation_invitation',
+        membership,
+      );
       return this.toSummaryDto(
         conversation.id,
         conversation.createdAt,
@@ -166,7 +192,9 @@ export class ConversationService {
       relations: {
         conversation: {
           members: {
-            user: true,
+            user: {
+              profile: true,
+            },
           },
         },
       },
@@ -196,6 +224,7 @@ export class ConversationService {
             id: peerMember.user.id,
             username: peerMember.user.username,
             rsa_public_key: peerMember.user.rsa_public_key,
+            profile: peerMember.user.profile,
           },
         );
       });
@@ -208,7 +237,10 @@ export class ConversationService {
       where: {
         id,
       },
-      select: ['id', 'username', 'rsa_public_key'],
+      relations: {
+        profile: true,
+      },
+      select: ['id', 'username', 'rsa_public_key', 'profile'],
     });
   }
 
@@ -268,6 +300,7 @@ export class ConversationService {
     const peer: ConversationPeerDto = {
       id: peerUser.id,
       username: peerUser.username,
+      userProfile: peerUser.profile,
     };
 
     return {

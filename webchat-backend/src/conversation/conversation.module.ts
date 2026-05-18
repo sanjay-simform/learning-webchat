@@ -7,6 +7,7 @@ import { MessageEntity } from 'src/database/schemas/messages.schema';
 import { User } from 'src/database/schemas/user.schema';
 import { RedisModule } from 'src/redis/redis.module';
 import { SharedModule } from 'src/shared/shared.module';
+import { ChatModule } from 'src/chat/chat.module';
 import { ConversationController } from './controllers/conversation.controller';
 import { MessagesController } from './controllers/messages.controller';
 import { ConversationCryptoService } from './services/conversation-crypto.service';
@@ -22,6 +23,7 @@ import { ConversationService } from './services/conversation.service';
     ]),
     SharedModule,
     RedisModule,
+    ChatModule,
   ],
   controllers: [ConversationController, MessagesController],
   providers: [ConversationService, ConversationCryptoService, JwtAuthGuard],

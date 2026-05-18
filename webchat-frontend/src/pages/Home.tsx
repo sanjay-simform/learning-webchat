@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/Button";
+import { ProfileCard } from "../components/ProfileCard";
 import { motion } from "motion/react";
 import { clearAuthSession } from "../utils/auth-session";
 
@@ -34,43 +35,30 @@ export const Home = () => {
           <h1 className="text-5xl font-bold text-primary mb-4">
             Welcome Back!
           </h1>
-          <p className="text-2xl text-text-secondary mb-2">
+          <p className="text-2xl text-text-secondary mb-8">
             Hello,{" "}
             <span className="text-accent-cyan font-medium">
               {user?.username}
             </span>
           </p>
-          <p className="text-text-muted mb-8">
-            You're signed in to WebChat. This is your premium chat application.
-          </p>
         </motion.div>
 
+        {/* Profile Card */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.24, delay: 0.15 }}
-          className="space-y-4"
+          className="mb-8 max-w-sm mx-auto"
         >
-          <div className="chat-card p-8 space-y-4">
-            <h2 className="text-lg font-semibold text-primary">
-              User Information
-            </h2>
-            <div className="space-y-3 text-left">
-              <div className="flex items-center justify-between py-2 border-b border-obsidian-500 border-opacity-30">
-                <span className="text-text-secondary">Username:</span>
-                <span className="text-primary font-medium">
-                  {user?.username}
-                </span>
-              </div>
-            </div>
-          </div>
+          <ProfileCard />
         </motion.div>
 
+        {/* Action Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.24, delay: 0.2 }}
-          className="mt-8 flex items-center gap-3"
+          className="flex items-center gap-3 justify-center"
         >
           <Button variant="primary" size="lg" onClick={() => navigate("/chat")}>
             Open Chat

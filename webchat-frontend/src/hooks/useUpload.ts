@@ -4,7 +4,7 @@ import {
   type UploadProgressEvent,
   type UploadResponse,
   type UploadError,
-} from "./upload.service";
+} from "../api-client/services/upload";
 
 export interface UseUploadState {
   isLoading: boolean;

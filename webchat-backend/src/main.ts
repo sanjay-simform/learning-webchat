@@ -4,6 +4,7 @@ import { WsAdapter } from '@nestjs/platform-ws';
 import { AppModule } from './app.module';
 import { ENV } from './config/env';
 import { readFileSync } from 'fs';
+import { join } from 'path';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -20,12 +21,13 @@ async function bootstrap() {
     origin: [
       ENV.FRONTEND_URL,
       'https://172.16.4.239:5173',
-      'https://172.20.0.1:5173',
+      'http://localhost:5173',
+      'https://unupbraided-leora-scalled.ngrok-free.dev',
     ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
   });
-
+  app.setGlobalPrefix('api');
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
@@ -34,6 +36,13 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // app.get(
+  //   () => /^(?!\/api|\/upload).*/,
+  //   (_, res) => {
+  //     res.sendFile(join(__dirname, '..', '..', 'dist', 'index.html'));
+  //   },
+  // );
 
   const port = ENV.PORT ?? 3000;
   await app.listen(port);

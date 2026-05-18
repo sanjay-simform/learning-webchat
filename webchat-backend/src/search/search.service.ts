@@ -39,8 +39,17 @@ export class SearchService {
 
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
-      .select(['user.id', 'user.username'])
+      .leftJoin('user.profile', 'profile')
+      .select([
+        'user.id',
+        'user.username',
+        'profile.avatarUrl',
+        'profile.displayName',
+      ])
       .where("user.username ILIKE :pattern ESCAPE '\\'", {
+        pattern: `%${this.escapeLikePattern(searchTerm)}%`,
+      })
+      .orWhere("profile.displayName ILIKE :pattern ESCAPE '\\'", {
         pattern: `%${this.escapeLikePattern(searchTerm)}%`,
       })
       .orderBy('user.username', 'ASC')
@@ -59,6 +68,8 @@ export class SearchService {
         (user): SearchUserItemDto => ({
           id: user.id,
           username: user.username,
+          avatarUrl: user.profile?.avatarUrl || null,
+          displayName: user.profile?.displayName || null,
         }),
       ),
       nextCursor:

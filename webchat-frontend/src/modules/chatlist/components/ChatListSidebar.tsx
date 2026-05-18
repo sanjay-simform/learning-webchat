@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import type { Chat } from "../../../types/chat";
 import { ChatListItem } from "./ChatListItem";

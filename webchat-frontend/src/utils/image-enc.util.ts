@@ -19,21 +19,6 @@ export interface EncryptedFileResult {
 const IV_LENGTH = 12;
 const AES_KEY_LENGTH = 256;
 
-function concatBuffers(buffers: Uint8Array[]): Uint8Array {
-  const totalLength = buffers.reduce((sum, b) => sum + b.length, 0);
-
-  const merged = new Uint8Array(totalLength);
-
-  let offset = 0;
-
-  for (const buffer of buffers) {
-    merged.set(buffer, offset);
-    offset += buffer.length;
-  }
-
-  return merged;
-}
-
 function uint8ToBase64(data: Uint8Array): string {
   let binary = "";
 

@@ -18,7 +18,7 @@ import {
   createQueuedPatch,
 } from "./chat/conversation-message.reducer";
 import { decryptImage } from "../utils/image-enc.util";
-import { API_BASE_URL } from "../api-client/api-client";
+import { UPLOAD_BASE_URL } from "../api-client/api-client";
 
 interface UseConversationMessagesResult {
   messages: Message[];
@@ -212,7 +212,9 @@ export function useConversationMessages(
             const iv = payload.iv;
 
             const imageUrl = await decryptImage(
-              await fetch(API_BASE_URL + mediaUrl).then((r) => r.arrayBuffer()),
+              await fetch(UPLOAD_BASE_URL + mediaUrl).then((r) =>
+                r.arrayBuffer(),
+              ),
               conversationKey,
               iv as string,
             );

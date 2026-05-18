@@ -12,6 +12,8 @@ import { useConversations } from "../../../api-client/services/conversation/conv
 import type { ConversationSummaryDto } from "../../../api-client/services/conversation/conversation.service.dto";
 import { useAuth } from "../../../context/AuthContext";
 import { useConversationMessages } from "../../../hooks/useConversationMessages";
+import { useConversationMemberEvent } from "../../../hooks/conversation/useConversationMember";
+import { useToast, ToastContainer } from "../../../components/Toast";
 
 const mapConversationToChat = (conversation: ConversationSummaryDto): Chat => ({
   id: conversation.id,
@@ -26,6 +28,13 @@ export const ChatPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
+
+  const { toasts, addToast, removeToast } = useToast();
+
+  // Listen for conversation invitation events
+  useConversationMemberEvent((username: string) => {
+    addToast(`${username} started a conversation with you`, "info", 5000);
+  });
 
   const conversationsQuery = useConversations();
   const conversations = conversationsQuery.data?.data ?? [];
@@ -162,6 +171,8 @@ export const ChatPage = () => {
         onClose={() => setIsNewChatModalOpen(false)}
         onConversationCreated={handleConversationCreated}
       />
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </MainLayout>
   );
 };

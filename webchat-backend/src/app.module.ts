@@ -16,6 +16,7 @@ import {
   MULTER_DESTINATION_FOLDER,
   UPLOAD_SERVE_ROOT,
 } from './upload/constant/multer.contant';
+import { ProfileModule } from './profile/profile.module';
 
 @Module({
   imports: [
@@ -23,6 +24,10 @@ import {
       rootPath: join(__dirname, '..', MULTER_DESTINATION_FOLDER),
       serveRoot: UPLOAD_SERVE_ROOT,
     }),
+    // ServeStaticModule.forRoot({
+    //   rootPath: join(__dirname, '..', '..', 'webchat-frontend', 'dist'),
+    //   exclude: ['/api/*path', '/upload/*path'],
+    // }),
     DatabaseModule,
     RedisModule,
     SharedModule,
@@ -32,6 +37,7 @@ import {
     SearchModule,
     ChatModule,
     UploadModule,
+    ProfileModule,
   ],
   controllers: [AppController],
   providers: [AppService],

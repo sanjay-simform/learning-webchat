@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
 import { clearAuthSession } from "../../../utils/auth-session";
+import { useUserProfile } from "../../../api-client/services/profile";
+import { UPLOAD_BASE_URL } from "../../../api-client/api-client";
 
 export const TopBar = ({
   onSearchChange,
@@ -11,6 +13,7 @@ export const TopBar = ({
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const userProfileQuery = useUserProfile();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
@@ -76,12 +79,24 @@ export const TopBar = ({
           {/* Profile Button */}
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 p-2 bg-elevated border border-obsidian-500 border-opacity-50 hover:bg-card rounded-lg transition-colors"
+            className="flex items-center gap-2 p-1 bg-elevated border border-obsidian-500 border-opacity-50 hover:bg-card rounded-full transition-colors"
           >
-            <div className="w-8 h-8 rounded-full bg-accent-cyan bg-opacity-20 flex items-center justify-center">
-              <span className="text-xs font-semibold text-accent-cyan">
-                {user?.username?.charAt(0).toUpperCase()}
-              </span>
+            <div className="w-8 h-8  bg-accent-cyan bg-opacity-20 flex items-center justify-center">
+              {userProfileQuery?.isLoading ? (
+                <span className="text-xs font-semibold text-accent-cyan">
+                  {user?.username?.charAt(0).toUpperCase()}
+                </span>
+              ) : userProfileQuery.data?.data?.avatarUrl ? (
+                <img
+                  src={UPLOAD_BASE_URL + userProfileQuery.data.data.avatarUrl}
+                  alt={user?.username || "Profile"}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <span className="text-xs font-semibold text-accent-cyan">
+                  {user?.username?.charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
           </button>
 
@@ -96,10 +111,12 @@ export const TopBar = ({
                 className="absolute top-12 right-0 w-48 chat-floating rounded-lg shadow-elevation-2 overflow-hidden border border-obsidian-500 border-opacity-50"
               >
                 <div className="p-3 border-b border-obsidian-500 border-opacity-30">
+                  <p className="text-lg font-medium text-primary">
+                    {userProfileQuery?.data?.data?.displayName || ""}
+                  </p>
                   <p className="text-sm font-medium text-primary">
                     {user?.username}
                   </p>
-                  <p className="text-xs text-text-secondary">{user?.id}</p>
                 </div>
                 <div className="p-2 space-y-1">
                   <button

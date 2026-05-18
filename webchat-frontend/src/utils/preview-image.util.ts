@@ -174,3 +174,53 @@ function blobToDataURL(blob: Blob): Promise<string> {
 function isImageBitmap(value: unknown): value is ImageBitmap {
   return typeof ImageBitmap !== "undefined" && value instanceof ImageBitmap;
 }
+
+export const extractGifFromClipboard = async (
+  clipboard: DataTransfer,
+): Promise<File | null> => {
+  const html = clipboard.getData("text/html");
+
+  if (!html) return null;
+
+  const parser = new DOMParser();
+
+  const doc = parser.parseFromString(html, "text/html");
+
+  const imgElements = Array.from(doc.querySelectorAll("img"));
+
+  for (const img of imgElements) {
+    const src = img.src;
+
+    if (!src) continue;
+
+    // detect probable gif url
+    const isGif =
+      src.toLowerCase().endsWith(".gif") ||
+      src.toLowerCase().includes(".gif?") ||
+      src.toLowerCase().includes("tenor") ||
+      src.toLowerCase().includes("giphy");
+
+    if (!isGif) continue;
+
+    try {
+      const response = await fetch(src, {});
+
+      if (!response.ok) continue;
+
+      const blob = await response.blob();
+
+      // ensure actual gif mime
+      if (blob.type !== "image/gif") continue;
+
+      const file = new File([blob], `pasted-${Date.now()}.gif`, {
+        type: "image/gif",
+      });
+
+      return file;
+    } catch (error) {
+      console.error("Failed to fetch GIF:", error);
+    }
+  }
+
+  return null;
+};

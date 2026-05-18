@@ -38,6 +38,10 @@ export class AuthService {
         password_hash: passwordHash,
         cryptoData: dto.cryptoData,
       });
+      await this.userService.createProfileForUser({
+        userId: user.id,
+        displayName: dto.username,
+      });
     } catch (error) {
       // Check for unique constraint violation
       if (error.code === '23505' || error.message.includes('duplicate key')) {

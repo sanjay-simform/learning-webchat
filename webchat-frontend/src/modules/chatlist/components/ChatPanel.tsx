@@ -9,6 +9,8 @@ import { useListVirtualizer } from "../../../hooks/useListVirtualizer.ts";
 import ImageUploadExample from "../../../components/ImageUploadExample.tsx";
 import type { ImageUploadExampleHandle } from "../../../components/ImageUploadExample.tsx";
 import { getBlobUrlFromFile } from "../../../utils/image-enc.util.ts";
+import { extractGifFromClipboard } from "../../../utils/preview-image.util.ts";
+import { useSocket } from "../../../context/SocketContext";
 
 interface ChatPanelProps {
   chat: Chat | null;
@@ -38,12 +40,17 @@ export const ChatPanel = ({
 }: ChatPanelProps) => {
   "use no memo";
 
+  const { sendEvent, onEvent } = useSocket();
   const [messageContent, setMessageContent] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isExtractingGif, setIsExtractingGif] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [peerIsTyping, setPeerIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<number | null>(null);
   const [uploadedImage, setUploadedImage] = useState<{
     url: string;
     fileName: string;
@@ -122,8 +129,45 @@ export const ChatPanel = ({
     isNearBottomRef.current = true;
     topLoadArmedRef.current = false;
     pendingLoadMoreMetricsRef.current = null;
+  }, [chat?.id]);
+
+  useEffect(() => {
     setShowScrollButton(false);
   }, [chat?.id]);
+
+  // Handle typing indicators
+  useEffect(() => {
+    const unsubscribeTyping = onEvent("user_typing", (data: unknown) => {
+      const typingData = data as { conversationId: string };
+      if (typingData.conversationId === chat?.id) {
+        setPeerIsTyping(true);
+      }
+    });
+
+    const unsubscribeStopTyping = onEvent(
+      "user_stop_typing",
+      (data: unknown) => {
+        const typingData = data as { conversationId: string };
+        if (typingData.conversationId === chat?.id) {
+          setPeerIsTyping(false);
+        }
+      },
+    );
+
+    return () => {
+      unsubscribeTyping?.();
+      unsubscribeStopTyping?.();
+    };
+  }, [chat?.id, onEvent]);
+
+  // Cleanup on unmount or chat change
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current !== null) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleMessagesScroll = () => {
     const container = messagesContainerRef.current;
@@ -235,14 +279,45 @@ export const ChatPanel = ({
   };
 
   const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
+    const clipboardData = e.clipboardData;
 
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    if (!clipboardData) return;
+
+    const items = Array.from(clipboardData.items);
+
+    const hasImageFile = items.some(
+      (item) => item.kind === "file" && item.type.startsWith("image/"),
+    );
+
+    const hasHtml = clipboardData.types.includes("text/html");
+    if (!hasImageFile && !hasHtml) {
+      return;
+    }
+    if (hasHtml && hasImageFile) {
+      setIsExtractingGif(true);
+
+      try {
+        const gif = await extractGifFromClipboard(clipboardData);
+
+        if (gif && imageUploadRef.current) {
+          e.preventDefault();
+
+          await imageUploadRef.current.handleUpload(gif);
+          return;
+        }
+      } catch (error) {
+        console.error("Error extracting GIF:", error);
+      } finally {
+        setIsExtractingGif(false);
+      }
+    }
+    // Image file paste
+    for (const item of items) {
       if (item.kind === "file" && item.type.startsWith("image/")) {
         e.preventDefault();
+
         const file = item.getAsFile();
+
         if (file && imageUploadRef.current) {
           try {
             await imageUploadRef.current.handleUpload(file);
@@ -250,7 +325,8 @@ export const ChatPanel = ({
             console.error("Error uploading pasted image:", error);
           }
         }
-        break;
+
+        return;
       }
     }
   };
@@ -264,6 +340,30 @@ export const ChatPanel = ({
       encryptionKey={conversationMessageKey() || ""}
     >
       <div className="flex flex-col h-full bg-base relative">
+        {/* GIF Extraction Loading Overlay */}
+        {isExtractingGif && (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-50 rounded-lg pointer-events-none">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 size={32} className="animate-spin text-accent-cyan" />
+              <p className="text-sm text-white font-medium">
+                Extracting GIF...
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Loading Overlay */}
+        {isUploading && !isExtractingGif && (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-50 rounded-lg pointer-events-none">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 size={32} className="animate-spin text-accent-cyan" />
+              <p className="text-sm text-white font-medium">
+                Uploading image...
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Chat Header */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -284,7 +384,15 @@ export const ChatPanel = ({
                 {chat.username}
               </h2>
               <p className="text-xs text-text-secondary">
-                {chat.isOnline ? "Active now" : "Away"}
+                {peerIsTyping ? (
+                  <span className="text-accent-cyan animate-pulse">
+                    typing...
+                  </span>
+                ) : chat.isOnline ? (
+                  "Active now"
+                ) : (
+                  "Away"
+                )}
               </p>
             </div>
           </div>
@@ -564,6 +672,32 @@ export const ChatPanel = ({
           </div>
         )}
 
+        {/* Upload Progress Bar (with preview) */}
+        {isUploading && uploadedImage && (
+          <div className="px-4 md:px-6 py-3 border-b border-obsidian-500 border-opacity-30 bg-obsidian-500/10">
+            <div className="flex items-center gap-3">
+              <Loader2
+                size={16}
+                className="animate-spin text-accent-cyan shrink-0"
+              />
+              <div className="flex-1">
+                <p className="text-xs text-text-secondary mb-1.5">
+                  Uploading image...
+                </p>
+                <div className="w-full bg-obsidian-500/20 rounded-full h-1.5">
+                  <div
+                    className="bg-accent-cyan h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+              <span className="text-xs text-text-secondary whitespace-nowrap">
+                {uploadProgress}%
+              </span>
+            </div>
+          </div>
+        )}
+
         <motion.form
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -593,11 +727,54 @@ export const ChatPanel = ({
           <div className="flex-1">
             <textarea
               value={messageContent}
-              disabled={isLoading || isUploading}
+              disabled={isLoading || isUploading || isExtractingGif}
               onChange={(e) => {
-                setMessageContent(e.target.value);
+                const newContent = e.target.value;
+                setMessageContent(newContent);
                 if (sendError) {
                   setSendError(null);
+                }
+
+                // Handle typing indicator
+                if (newContent.trim() && chat?.id) {
+                  if (!isTyping) {
+                    setIsTyping(true);
+                  }
+
+                  // Send typing event
+                  try {
+                    sendEvent("user_typing", { conversationId: chat.id });
+                  } catch {
+                    // Socket might not be ready, ignore
+                  }
+
+                  // Clear existing timeout
+                  if (typingTimeoutRef.current !== null) {
+                    window.clearTimeout(typingTimeoutRef.current);
+                  }
+
+                  // Set new timeout for stop typing
+                  typingTimeoutRef.current = window.setTimeout(() => {
+                    setIsTyping(false);
+                    try {
+                      sendEvent("user_stop_typing", {
+                        conversationId: chat.id,
+                      });
+                    } catch {
+                      // Socket might not be ready, ignore
+                    }
+                  }, 3000);
+                } else if (!newContent.trim() && isTyping && chat?.id) {
+                  // Clear typing if input is empty
+                  setIsTyping(false);
+                  if (typingTimeoutRef.current !== null) {
+                    window.clearTimeout(typingTimeoutRef.current);
+                  }
+                  try {
+                    sendEvent("user_stop_typing", { conversationId: chat.id });
+                  } catch {
+                    // Socket might not be ready, ignore
+                  }
                 }
               }}
               onPaste={handlePaste}
@@ -608,7 +785,11 @@ export const ChatPanel = ({
                 }
               }}
               placeholder={
-                isUploading ? "Uploading image..." : "Type a message..."
+                isExtractingGif
+                  ? "Extracting GIF..."
+                  : isUploading
+                    ? "Uploading image..."
+                    : "Type a message..."
               }
               className="w-full chat-input pl-4 pr-4 py-2.5 text-sm resize-none max-h-32 disabled:opacity-60 disabled:cursor-not-allowed"
               rows={1}

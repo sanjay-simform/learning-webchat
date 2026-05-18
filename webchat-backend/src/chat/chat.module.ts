@@ -21,5 +21,6 @@ import { MessageWorkerService } from './services/message-worker.service';
     ConnectionRegistryService,
     MessageWorkerService,
   ],
+  exports: [ChatGateway, ConnectionRegistryService],
 })
 export class ChatModule {}

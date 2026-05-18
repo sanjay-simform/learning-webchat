@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from 'src/database/schemas/user.schema';
 import { CryptoDataDto } from 'src/auth/dtos/signup-request.dto';
+import { UserProfile } from 'src/database/schemas/user-profile.schema';
 
 export interface CreateUserInput {
   username_normalized: string;
@@ -16,6 +17,9 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+
+    @InjectRepository(UserProfile)
+    private userProfileRepository: Repository<UserProfile>,
   ) {}
 
   async create(input: CreateUserInput): Promise<User> {
@@ -57,5 +61,14 @@ export class UserService {
         id,
       },
     });
+  }
+
+  async createProfileForUser(
+    profileData: Partial<UserProfile>,
+  ): Promise<UserProfile> {
+    const profile = this.userProfileRepository.create({
+      ...profileData,
+    });
+    return await this.userProfileRepository.save(profile);
   }
 }

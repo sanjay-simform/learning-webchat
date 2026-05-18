@@ -151,10 +151,6 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
           CHAT_STREAM_KEY,
           '>',
         )) as XReadGroupResponse;
-        console.log(
-          '🚀 ~ MessageWorkerService ~ consumeLoop ~ response:',
-          JSON.stringify(response),
-        );
 
         if (!response || response.length === 0) {
           continue;
@@ -172,10 +168,6 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processEntries(entries: StreamEntry[]): Promise<void> {
-    console.log(
-      '🚀 ~ MessageWorkerService ~ processEntries ~ entries:',
-      entries,
-    );
     for (const entry of entries) {
       await this.processEntry(entry);
     }
@@ -183,7 +175,6 @@ export class MessageWorkerService implements OnModuleInit, OnModuleDestroy {
 
   private async processEntry(entry: StreamEntry): Promise<void> {
     const payload = this.parseStreamEntry(entry);
-    console.log('🚀 ~ MessageWorkerService ~ processEntry ~ payload:', payload);
     if (!payload) {
       await this.ackEntry(entry[0]);
       return;

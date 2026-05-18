@@ -4,7 +4,7 @@ import type { AuthUser } from "../../types/auth";
 import { MessageStatus, type Message } from "../../types/chat";
 import { decryptMessageWithConversationKey } from "../../utils/crypto-utils";
 import { decryptImage } from "../../utils/image-enc.util";
-import { API_BASE_URL } from "../../api-client/api-client";
+import { UPLOAD_BASE_URL } from "../../api-client/api-client";
 import type {
   MessageDeliveryAckEvent,
   OutboundChatMessageEvent,
@@ -60,7 +60,7 @@ export function useConversationSocketEvents({
           if (eventPayload?.mediaUrl && eventPayload.iv) {
             try {
               const encryptedImageResponse = await fetch(
-                API_BASE_URL + eventPayload.mediaUrl,
+                UPLOAD_BASE_URL + eventPayload.mediaUrl,
               );
               if (encryptedImageResponse.ok) {
                 const encryptedBuffer =

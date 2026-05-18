@@ -72,6 +72,9 @@ export class ChatGateway {
       authenticatedClient.userId = payload.sub;
 
       this.connectionRegistry.register(payload.sub, client);
+
+      // Broadcast to all other online users that this user came online
+      this.broadcastPresenceUpdate(payload.sub, 'user_came_online');
     } catch {
       this.emitDirect(client, 'auth_error', { message: 'Invalid token' });
       client.terminate();
@@ -85,6 +88,14 @@ export class ChatGateway {
     }
 
     this.connectionRegistry.remove(authenticatedClient.userId, client);
+
+    // Check if user is now completely offline
+    if (!this.connectionRegistry.isUserOnline(authenticatedClient.userId)) {
+      this.broadcastPresenceUpdate(
+        authenticatedClient.userId,
+        'user_went_offline',
+      );
+    }
   }
 
   @SubscribeMessage('send_message')
@@ -255,5 +266,48 @@ export class ChatGateway {
     }
 
     return token;
+  }
+
+  /**
+   * Handle user typing indicator
+   */
+  @SubscribeMessage('user_typing')
+  handleUserTyping(
+    @ConnectedSocket() client: WebSocket,
+    @MessageBody() dto: { conversationId: string },
+  ): void {
+    const authenticatedClient = client as AuthenticatedSocket;
+    if (!authenticatedClient.userId) {
+      throw new WsException('Unauthorized websocket session');
+    }
+
+    // Broadcast typing indicator to all other online users
+    const onlineUsers = this.connectionRegistry.getOnlineUsers();
+    for (const onlineUserId of onlineUsers) {
+      if (onlineUserId !== authenticatedClient.userId) {
+        this.connectionRegistry.emitToUser(onlineUserId, 'user_typing', {
+          typingUserId: authenticatedClient.userId,
+          conversationId: dto.conversationId,
+        });
+      }
+    }
+  }
+
+  /**
+   * Broadcast presence update to all other online users
+   */
+  private broadcastPresenceUpdate(
+    userId: string,
+    event: 'user_came_online' | 'user_went_offline',
+  ): void {
+    const onlineUsers = this.connectionRegistry.getOnlineUsers();
+    for (const onlineUserId of onlineUsers) {
+      if (onlineUserId !== userId) {
+        this.connectionRegistry.emitToUser(onlineUserId, event, {
+          userId,
+          timestamp: Math.floor(Date.now() / 1000),
+        });
+      }
+    }
   }
 }

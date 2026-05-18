@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
 } from 'typeorm';
+import { UserProfile } from './user-profile.schema';
 
 @Entity()
 export class User {
@@ -81,4 +83,8 @@ export class User {
     nullable: false,
   })
   updated_at: Date;
+
+  // relations
+  @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
+  profile!: UserProfile;
 }

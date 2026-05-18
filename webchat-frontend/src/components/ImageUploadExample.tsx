@@ -1,4 +1,3 @@
-import { API_BASE_URL } from "../api-client/api-client";
 import {
   UploadService,
   type UploadProgressEvent,
@@ -51,8 +50,6 @@ export const ImageUploadExample = forwardRef<
     ref,
   ) => {
     const [isUploading, setIsUploading] = useState(false);
-    const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
 
     const handleUpload = async (file: File) => {
@@ -60,13 +57,11 @@ export const ImageUploadExample = forwardRef<
       if (!UploadService.isValidImage(file)) {
         const error =
           "Invalid file. Please upload a valid image file (max 10MB).";
-        setError(error);
         onUploadError?.(error);
         return;
       }
 
       setIsUploading(true);
-      setError(null);
       setFileName(file.name);
 
       try {
@@ -82,7 +77,6 @@ export const ImageUploadExample = forwardRef<
           },
         );
 
-        setUploadedUrl(response.url);
         onUploadProgress?.(100);
         if (onUploadSuccess) {
           onUploadSuccess(unencryptedFile, {
@@ -95,7 +89,6 @@ export const ImageUploadExample = forwardRef<
         }
       } catch (err: any) {
         const errorMsg = err.message || "Upload failed. Please try again.";
-        setError(errorMsg);
         onUploadError?.(errorMsg);
         console.error("Upload error:", err);
       } finally {

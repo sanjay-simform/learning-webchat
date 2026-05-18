@@ -13,6 +13,7 @@ import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { useInfiniteSearchUsers } from "../../../api-client/services/search/search.service";
 import { useInviteUser } from "../../../api-client/services/conversation/conversation.service";
 import type { ConversationSummaryDto } from "../../../api-client/services/conversation/conversation.service.dto";
+import { UPLOAD_BASE_URL } from "../../../api-client/api-client";
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -311,10 +312,18 @@ export const NewChatModal = ({
                           disabled={isCurrentUser || isInviting}
                           className="group flex w-full items-center gap-3 rounded-xl border border-obsidian-500 border-opacity-50 bg-elevated px-4 py-3 text-left transition-colors hover:border-opacity-80 hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <Avatar
-                            initials={getInitials(result.username)}
-                            size="md"
-                          />
+                          {result.avatarUrl ? (
+                            <img
+                              src={UPLOAD_BASE_URL + result.avatarUrl}
+                              alt={result.username}
+                              className="h-10 w-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <Avatar
+                              initials={getInitials(result.username)}
+                              size="md"
+                            />
+                          )}
 
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-3">
@@ -326,7 +335,7 @@ export const NewChatModal = ({
                               </span>
                             </div>
                             <p className="mt-1 truncate text-xs text-text-secondary">
-                              Full name unavailable
+                              {result?.displayName || "No display name"}
                             </p>
                           </div>
 
