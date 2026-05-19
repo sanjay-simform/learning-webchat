@@ -74,7 +74,7 @@ export const ChatListItem = ({
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {unreadCount > 0 && (
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold shrink-0">
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-300 text-black text-xs font-bold shrink-0">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </div>
               )}

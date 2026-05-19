@@ -48,10 +48,10 @@ export class UploadController {
       storage: imageUploadStorage,
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-          cb(new BadRequestException('Only image files are allowed'), false);
-          return;
-        }
+        // if (!file.mimetype.startsWith('image/')) {
+        //   cb(new BadRequestException('Only image files are allowed'), false);
+        //   return;
+        // }
 
         cb(null, true);
       },

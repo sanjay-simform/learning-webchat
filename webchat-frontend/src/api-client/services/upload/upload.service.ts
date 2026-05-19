@@ -60,7 +60,7 @@ export class UploadService {
   ): Promise<UploadResponse> {
     try {
       // Validate file
-      UploadService.validateFile(file);
+      // UploadService.validateFile(file);
 
       // Create FormData
       const formData = new FormData();

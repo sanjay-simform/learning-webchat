@@ -13,7 +13,7 @@ import { FormInput } from "./FormInput";
 import { Skeleton, SkeletonCircle, SkeletonText } from "./Skeleton";
 import { cn } from "../lib/cn";
 import { UPLOAD_BASE_URL } from "../api-client/api-client";
-import { Cross, LucideCross } from "lucide-react";
+import { Circle, CircleMinus, Cross, LucideCross } from "lucide-react";
 
 interface ProfileCardProps {
   className?: string;
@@ -259,16 +259,16 @@ export const ProfileCard = ({ className }: ProfileCardProps) => {
                   </motion.div>
                 )}
               </div>
-              {profile?.avatarUrl ? (
+              {profile?.avatarUrl && isEditing ? (
                 <span
                   className={cn(
-                    "bg-red-500 rounded-full absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 cursor-pointer hover:bg-red-600 transition-colors",
+                    "bg-red-500 rounded-full absolute top-0 right-0   cursor-pointer hover:bg-red-600 transition-colors",
                     isUpdating && "opacity-50 cursor-not-allowed",
                   )}
                   onClick={handleRemoveAvatar}
                   title="Remove profile picture"
                 >
-                  <LucideCross className="w-6 h-6 text-white rotate-45" />
+                  <CircleMinus className="w-6 h-6 text-white" />
                 </span>
               ) : null}
 

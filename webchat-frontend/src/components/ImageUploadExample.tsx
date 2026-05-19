@@ -26,6 +26,7 @@ export interface ImageUploadExampleProps {
       iv: string;
       authTag: string;
       type: string;
+      size: number;
     },
   ) => void;
   onUploadError?: (error: string) => void;
@@ -54,12 +55,12 @@ export const ImageUploadExample = forwardRef<
 
     const handleUpload = async (file: File) => {
       // Validate file before upload
-      if (!UploadService.isValidImage(file)) {
-        const error =
-          "Invalid file. Please upload a valid image file (max 10MB).";
-        onUploadError?.(error);
-        return;
-      }
+      // if (!UploadService.isValidImage(file)) {
+      //   const error =
+      //     "Invalid file. Please upload a valid image file (max 10MB).";
+      //   onUploadError?.(error);
+      //   return;
+      // }
 
       setIsUploading(true);
       setFileName(file.name);
@@ -85,6 +86,7 @@ export const ImageUploadExample = forwardRef<
             iv,
             authTag,
             type: file.type,
+            size: file.size,
           });
         }
       } catch (err: any) {
@@ -142,7 +144,7 @@ export const ImageUploadExample = forwardRef<
             id="file-input"
             onChange={handleFileChange}
             disabled={isUploading}
-            accept="image/*"
+            // accept="image/*"
             className="hidden"
           />
           {children ?? (

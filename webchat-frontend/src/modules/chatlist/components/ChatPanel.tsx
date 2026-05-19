@@ -1,16 +1,27 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "motion/react";
+import EmojiPicker from "emoji-picker-react";
 import type { Chat, Message, MessagePayload } from "../../../types/chat";
 import { MessageStatus } from "../../../types/chat";
 import { EmptyChat } from "./EmptyChat";
 import { LoadingSpinner } from "../../../components/LoadingSpinner";
-import { Check, CheckCheck, CircleAlert, Loader2 } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  CircleAlert,
+  Loader2,
+  Smile,
+  Image,
+} from "lucide-react";
 import { useListVirtualizer } from "../../../hooks/useListVirtualizer.ts";
 import ImageUploadExample from "../../../components/ImageUploadExample.tsx";
 import type { ImageUploadExampleHandle } from "../../../components/ImageUploadExample.tsx";
 import { getBlobUrlFromFile } from "../../../utils/image-enc.util.ts";
 import { extractGifFromClipboard } from "../../../utils/preview-image.util.ts";
 import { useSocket } from "../../../context/SocketContext";
+import { TenorGifPicker } from "../../../components/TenorGifPicker.tsx";
+
+import { AttachmentMessage } from "./AttachmentMessage.tsx";
 
 interface ChatPanelProps {
   chat: Chat | null;
@@ -50,6 +61,8 @@ export const ChatPanel = ({
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [peerIsTyping, setPeerIsTyping] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const typingTimeoutRef = useRef<number | null>(null);
   const [uploadedImage, setUploadedImage] = useState<{
     url: string;
@@ -58,6 +71,7 @@ export const ChatPanel = ({
     authTag: string;
     iv: string;
     type: string;
+    size: number;
   } | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -131,6 +145,7 @@ export const ChatPanel = ({
     pendingLoadMoreMetricsRef.current = null;
     // Clear typing state when chat changes
     setPeerIsTyping(false);
+    setShowEmojiPicker(false);
   }, [chat?.id]);
 
   useEffect(() => {
@@ -225,6 +240,7 @@ export const ChatPanel = ({
           mimeType: uploadedImage.type,
           authTag: uploadedImage.authTag,
           iv: uploadedImage.iv,
+          fileSize: uploadedImage.size,
         };
       }
       await onSendMessage(messageContent, messagePayload);
@@ -272,6 +288,7 @@ export const ChatPanel = ({
     imageData: {
       url: string;
       fileName: string;
+      size: number;
       authTag: string;
       type: string;
       iv: string;
@@ -343,6 +360,22 @@ export const ChatPanel = ({
         }
 
         return;
+      }
+    }
+  };
+
+  const handleEmojiClick = (emojiData: { emoji: string }) => {
+    setMessageContent((prev) => prev + emojiData.emoji);
+  };
+
+  const handleGifSelected = async (gifFile: File) => {
+    if (imageUploadRef.current) {
+      try {
+        await imageUploadRef.current.handleUpload(gifFile);
+        // Keep the GIF picker open after selection
+      } catch (error) {
+        console.error("Error uploading GIF:", error);
+        setSendError("Failed to upload GIF");
       }
     }
   };
@@ -549,18 +582,31 @@ export const ChatPanel = ({
                                   
                                   `}
                           >
-                            {message.imgUrl && (
-                              <img
-                                src={message.imgUrl}
-                                alt="Message attachment"
-                                className="w-full rounded-lg mb-2 max-h-80 object-cover"
-                                onError={(e) => {
-                                  // Fallback if blob URL expires
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                }}
-                              />
-                            )}
+                            {message.imgUrl ? (
+                              message.payload?.mimeType?.includes("image") ? (
+                                <img
+                                  src={message.imgUrl}
+                                  alt="Message attachment"
+                                  className="w-full rounded-lg mb-2 max-h-80 object-cover"
+                                  onError={(e) => {
+                                    // Fallback if blob URL expires
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <>
+                                  {/* a file attachement with name and size and download link */}
+                                  <AttachmentMessage
+                                    className="rounded-lg mb-2 max-h-80"
+                                    attachment={{
+                                      ...message.payload,
+                                      imgUrl: message.imgUrl || "",
+                                    }}
+                                  ></AttachmentMessage>
+                                </>
+                              )
+                            ) : null}
                             {message.content && (
                               <p className="text-sm wrap-break-word">
                                 {message.content}
@@ -740,6 +786,26 @@ export const ChatPanel = ({
             </svg>
           </button>
 
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-2.5 hover:bg-elevated rounded-lg transition-colors shrink-0"
+            aria-label="Open emoji picker"
+          >
+            <Smile className="w-5 h-5 text-accent-cyan" />
+          </button>
+          {/* 
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => setShowGifPicker(!showGifPicker)}
+            className="p-2.5 hover:bg-elevated rounded-lg transition-colors shrink-0"
+            aria-label="Open GIF picker"
+          >
+            <Image className="w-5 h-5 text-accent-cyan" />
+          </button> */}
+
           <div className="flex-1">
             <textarea
               value={messageContent}
@@ -847,6 +913,40 @@ export const ChatPanel = ({
             )}
           </button>
         </motion.form>
+
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="px-2 md:px-4 py-2 border-t border-obsidian-500 border-opacity-30 bg-elevated"
+          >
+            <EmojiPicker
+              onEmojiClick={handleEmojiClick}
+              theme={"dark" as any}
+              width="100%"
+              height={350}
+              previewConfig={{ showPreview: false }}
+              searchPlaceHolder="Search emoji..."
+              skinTonesDisabled={true}
+            />
+          </motion.div>
+        )}
+
+        {/* GIF Picker */}
+        {showGifPicker && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+          >
+            <TenorGifPicker
+              onGifSelected={handleGifSelected}
+              isLoading={isUploading || isExtractingGif}
+            />
+          </motion.div>
+        )}
 
         {sendError && (
           <div className="px-4 md:px-6 pb-3 text-xs text-semantic-danger">

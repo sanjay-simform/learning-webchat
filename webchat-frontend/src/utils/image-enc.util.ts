@@ -58,9 +58,9 @@ export async function encryptImage(
     throw new TypeError("Invalid file");
   }
 
-  if (!file.type.startsWith("image/")) {
-    throw new Error("File must be an image");
-  }
+  // if (!file.type.startsWith("image/")) {
+  //   throw new Error("File must be an image");
+  // }
 
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
 
