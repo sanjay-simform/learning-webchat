@@ -226,6 +226,7 @@ export class ConversationService {
             rsa_public_key: peerMember.user.rsa_public_key,
             profile: peerMember.user.profile,
           },
+          membership.unreadCount,
         );
       });
   }
@@ -296,6 +297,7 @@ export class ConversationService {
     createdAt: Date,
     encryptedConversationKey: string,
     peerUser: ConversationUserProjection,
+    unreadCount: number = 0,
   ): ConversationSummaryDto {
     const peer: ConversationPeerDto = {
       id: peerUser.id,
@@ -308,6 +310,81 @@ export class ConversationService {
       createdAt,
       encryptedConversationKey,
       peer,
+      unreadCount,
     };
+  }
+
+  /**
+   * Increment unread count for a user in a specific conversation
+   */
+  async incrementUnreadCount(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.conversationMemberRepository
+      .createQueryBuilder()
+      .update(ConversationMember)
+      .set({
+        unreadCount: () => '"unreadCount" + 1',
+      })
+      .where('conversationId = :conversationId AND userId = :userId', {
+        conversationId,
+        userId,
+      })
+      .execute();
+  }
+
+  /**
+   * Reset unread count to 0 for a user in a specific conversation
+   */
+  async resetUnreadCount(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.conversationMemberRepository.update(
+      {
+        conversationId,
+        userId,
+      },
+      {
+        unreadCount: 0,
+      },
+    );
+  }
+
+  /**
+   * Get unread count for a user in a specific conversation
+   */
+  async getUnreadCount(
+    conversationId: string,
+    userId: string,
+  ): Promise<number> {
+    const membership = await this.conversationMemberRepository.findOne({
+      where: {
+        conversationId,
+        userId,
+      },
+      select: ['unreadCount'],
+    });
+
+    return membership?.unreadCount ?? 0;
+  }
+
+  /**
+   * Get all unread counts for a user
+   */
+  async getUnreadCountsForUser(userId: string): Promise<Map<string, number>> {
+    const memberships = await this.conversationMemberRepository.find({
+      where: {
+        userId,
+      },
+      select: ['conversationId', 'unreadCount'],
+    });
+
+    const unreadCounts = new Map<string, number>();
+    for (const membership of memberships) {
+      unreadCounts.set(membership.conversationId, membership.unreadCount);
+    }
+    return unreadCounts;
   }
 }

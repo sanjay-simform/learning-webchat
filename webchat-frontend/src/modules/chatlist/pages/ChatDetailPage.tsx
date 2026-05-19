@@ -1,24 +1,65 @@
 import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useCallback } from "react";
 import { motion } from "motion/react";
 import { MainLayout } from "../../../layouts/MainLayout";
 import { ChatPanel } from "../components";
 import { useConversations } from "../../../api-client/services/conversation/conversation.service";
 import { useAuth } from "../../../context/AuthContext";
+import { useSocket } from "../../../context/SocketContext";
 import { useConversationMessages } from "../../../hooks/useConversationMessages";
+import { useUnreadMessages } from "../../../hooks/chat/useUnreadMessages";
+import { useUnreadCountSocketEvents } from "../../../hooks/chat/useUnreadCountSocketEvents";
+import { apiClient } from "../../../api-client/api-client";
 
 export const ChatDetailPage = () => {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { sendEvent } = useSocket();
   const conversationsQuery = useConversations();
   const conversations = conversationsQuery.data?.data ?? [];
   const conversation = chatId
     ? (conversations.find((item) => item.id === chatId) ?? null)
     : null;
   const conversationMessages = useConversationMessages(conversation);
+  const { resetUnread } = useUnreadMessages();
+
+  // Listen to unread count updates
+  useUnreadCountSocketEvents({
+    onUnreadCountUpdated: () => {
+      // Unread updates are handled at ChatPage level
+    },
+  });
+
   const handleBackClick = () => {
     navigate("/chat");
   };
+
+  // Reset unread count when conversation is loaded
+  useEffect(() => {
+    if (conversation) {
+      try {
+        sendEvent("set_active_conversation", {
+          conversationId: conversation.id,
+        });
+      } catch {
+        console.error("Failed to set active conversation on backend");
+      }
+
+      resetUnread(conversation.id);
+      const markAsReadAsync = async () => {
+        try {
+          await apiClient.put(
+            `/conversations/${conversation.id}/mark-as-read`,
+            {},
+          );
+        } catch (error) {
+          console.error("Failed to mark conversation as read:", error);
+        }
+      };
+      void markAsReadAsync();
+    }
+  }, [conversation, sendEvent, resetUnread]);
 
   if (conversationsQuery.isLoading) {
     return (

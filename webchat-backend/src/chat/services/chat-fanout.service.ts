@@ -5,6 +5,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import type IORedis from 'ioredis';
 import {
@@ -20,19 +21,24 @@ import {
   CHAT_DELIVERED_CHANNEL,
   CHAT_OUTBOUND_CHANNEL,
   CHAT_SEEN_CHANNEL,
+  CHAT_UNREAD_COUNT_CHANNEL,
 } from '../constants';
 import {
   MessageDeliveryAckEvent,
   MessageDeliveredReceiptEvent,
   MessageSeenReceiptEvent,
   OutboundChatMessageEvent,
+  UnreadCountUpdatedEvent,
 } from '../types/chat-events';
 import { In, Repository } from 'typeorm';
 import { ConnectionRegistryService } from './connection-registry.service';
+import { ConversationService } from 'src/conversation/services/conversation.service';
+import { ChatActivityService } from './chat-activity.service';
 
 @Injectable()
 export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ChatFanoutService.name);
+  private conversationService: ConversationService | null = null;
 
   private readonly redisMessageHandler = (
     channel: string,
@@ -42,7 +48,9 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
   };
 
   constructor(
+    private readonly moduleRef: ModuleRef,
     private readonly connectionRegistry: ConnectionRegistryService,
+    private readonly chatActivityService: ChatActivityService,
     @Inject(REDIS_CONNECTION as string)
     private readonly commandRedis: IORedis,
     @Inject(REDIS_SUBSCRIBER_CONNECTION as string)
@@ -51,6 +59,21 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
     private readonly messageRepository: Repository<MessageEntity>,
   ) {}
 
+  private getConversationService(): ConversationService {
+    if (!this.conversationService) {
+      const service = this.moduleRef.get(ConversationService, {
+        strict: false,
+      });
+      if (!service) {
+        throw new Error(
+          'ConversationService is not available. Ensure ConversationModule is imported.',
+        );
+      }
+      this.conversationService = service;
+    }
+    return this.conversationService;
+  }
+
   async onModuleInit(): Promise<void> {
     this.subscriberRedis.on('message', this.redisMessageHandler);
     await this.subscriberRedis.subscribe(
@@ -58,6 +81,7 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
       CHAT_ACK_CHANNEL,
       CHAT_DELIVERED_CHANNEL,
       CHAT_SEEN_CHANNEL,
+      CHAT_UNREAD_COUNT_CHANNEL,
     );
   }
 
@@ -92,6 +116,12 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
 
     if (channel === CHAT_SEEN_CHANNEL) {
       await this.handleSeenReceipt(rawMessage);
+      return;
+    }
+
+    if (channel === CHAT_UNREAD_COUNT_CHANNEL) {
+      await this.handleUnreadCountUpdate(rawMessage);
+      return;
     }
   }
 
@@ -104,6 +134,37 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
         'new_message',
         outboundEvent,
       );
+
+      // Check if recipient is viewing this conversation
+      const isViewing = this.chatActivityService.isUserViewingConversation(
+        outboundEvent.recipientUserId,
+        outboundEvent.conversationId,
+      );
+
+      // If not viewing, increment unread count
+      if (!isViewing) {
+        await this.getConversationService().incrementUnreadCount(
+          outboundEvent.conversationId,
+          outboundEvent.recipientUserId,
+        );
+
+        // Get the updated unread count and publish it
+        const unreadCount = await this.getConversationService().getUnreadCount(
+          outboundEvent.conversationId,
+          outboundEvent.recipientUserId,
+        );
+
+        const unreadEvent: UnreadCountUpdatedEvent = {
+          conversationId: outboundEvent.conversationId,
+          unreadCount,
+          recipientUserId: outboundEvent.recipientUserId,
+        };
+
+        await this.commandRedis.publish(
+          CHAT_UNREAD_COUNT_CHANNEL,
+          JSON.stringify(unreadEvent),
+        );
+      }
 
       const deliveryAck: MessageDeliveryAckEvent = {
         messageId: outboundEvent.messageId,
@@ -227,6 +288,11 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
         id: In(uniqueMessageIds),
       });
 
+      // Get unique conversation IDs from messages
+      const conversationIds = [
+        ...new Set(messages.map((m) => m.conversationId)),
+      ];
+
       for (const message of messages) {
         if (message.senderUserId === seenReceipt.recipientUserId) {
           continue;
@@ -251,9 +317,46 @@ export class ChatFanoutService implements OnModuleInit, OnModuleDestroy {
           } satisfies MessageDeliveryAckEvent,
         );
       }
+
+      // Reset unread counts for the conversations where messages were marked as seen
+      for (const conversationId of conversationIds) {
+        await this.getConversationService().resetUnreadCount(
+          conversationId,
+          seenReceipt.recipientUserId,
+        );
+
+        // Broadcast unread count update
+        const unreadEvent: UnreadCountUpdatedEvent = {
+          conversationId,
+          unreadCount: 0,
+          recipientUserId: seenReceipt.recipientUserId,
+        };
+
+        await this.commandRedis.publish(
+          CHAT_UNREAD_COUNT_CHANNEL,
+          JSON.stringify(unreadEvent),
+        );
+      }
     } catch (error) {
       this.logger.error(
         `Failed handling seen receipt event: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async handleUnreadCountUpdate(rawMessage: string): Promise<void> {
+    try {
+      const unreadEvent = JSON.parse(rawMessage) as UnreadCountUpdatedEvent;
+
+      // Broadcast to the recipient user
+      this.connectionRegistry.emitToUser(
+        unreadEvent.recipientUserId,
+        'unread_count_updated',
+        unreadEvent,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed handling unread count update event: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

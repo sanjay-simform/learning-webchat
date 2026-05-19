@@ -8,6 +8,7 @@ import { ChatGateway } from './chat.gateway';
 import { ChatFanoutService } from './services/chat-fanout.service';
 import { ConnectionRegistryService } from './services/connection-registry.service';
 import { MessageWorkerService } from './services/message-worker.service';
+import { ChatActivityService } from './services/chat-activity.service';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { MessageWorkerService } from './services/message-worker.service';
     ChatFanoutService,
     ConnectionRegistryService,
     MessageWorkerService,
+    ChatActivityService,
   ],
-  exports: [ChatGateway, ConnectionRegistryService],
+  exports: [ChatGateway, ConnectionRegistryService, ChatActivityService],
 })
 export class ChatModule {}

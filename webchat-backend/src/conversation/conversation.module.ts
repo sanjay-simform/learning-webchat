@@ -27,5 +27,6 @@ import { ConversationService } from './services/conversation.service';
   ],
   controllers: [ConversationController, MessagesController],
   providers: [ConversationService, ConversationCryptoService, JwtAuthGuard],
+  exports: [ConversationService],
 })
 export class ConversationModule {}

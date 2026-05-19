@@ -12,6 +12,7 @@ export interface ConversationSummaryDto {
   createdAt: string;
   encryptedConversationKey: string;
   peer: ConversationPeerDto;
+  unreadCount: number;
 }
 
 export interface InviteUserRequestDto {

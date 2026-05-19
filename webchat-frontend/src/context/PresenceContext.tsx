@@ -6,6 +6,11 @@ interface PresenceEventData {
   timestamp?: number;
 }
 
+interface InitialOnlineUsersData {
+  userIds: string[];
+  timestamp?: number;
+}
+
 interface PresenceContextType {
   onlineUsers: Set<string>;
   isUserOnline: (userId: string) => boolean;
@@ -22,6 +27,21 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({
   const { onEvent } = useSocket();
 
   useEffect(() => {
+    // Listen for initial online users on connection
+    const unsubscribeInitial = onEvent(
+      "initial_online_users",
+      (data: unknown) => {
+        const eventData = data as InitialOnlineUsersData;
+        setOnlineUsers((prev) => {
+          const updated = new Set(prev);
+          for (const userId of eventData.userIds) {
+            updated.add(userId);
+          }
+          return updated;
+        });
+      },
+    );
+
     // Listen for user coming online
     const unsubscribeOnline = onEvent("user_came_online", (data: unknown) => {
       const eventData = data as PresenceEventData;
@@ -43,6 +63,7 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => {
+      unsubscribeInitial?.();
       unsubscribeOnline?.();
       unsubscribeOffline?.();
     };

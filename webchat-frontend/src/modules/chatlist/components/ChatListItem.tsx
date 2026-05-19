@@ -9,12 +9,14 @@ interface ChatListItemProps {
   conversation: ConversationSummaryDto;
   isSelected: boolean;
   onClick: () => void;
+  unreadCount?: number;
 }
 
 export const ChatListItem = ({
   conversation,
   isSelected,
   onClick,
+  unreadCount = 0,
 }: ChatListItemProps) => {
   const { isUserOnline } = usePresence();
   const username = conversation.peer.username?.trim() || "Unknown user";
@@ -43,7 +45,7 @@ export const ChatListItem = ({
             <img
               src={avatarUrl}
               alt={username}
-              className="max-w-16 max-h-16 rounded-full"
+              className="max-w-16 max-h-16 rounded-full aspect-square"
             />
           ) : (
             <Avatar initials={username.charAt(0).toUpperCase()} size="lg" />
@@ -51,7 +53,7 @@ export const ChatListItem = ({
           {/* Presence Indicator Dot */}
           <div
             className={cn(
-              "absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-elevated",
+              "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-elevated",
               peerIsOnline ? "bg-green-500" : "bg-gray-500",
             )}
           />
@@ -60,7 +62,7 @@ export const ChatListItem = ({
         {/* Chat Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-2">
-            <div>
+            <div className="flex-1 min-w-0">
               {conversation.peer.userProfile?.displayName && (
                 <h2 className="text-lg font-medium text-primary truncate">
                   {conversation.peer.userProfile.displayName}
@@ -70,9 +72,16 @@ export const ChatListItem = ({
                 {username}
               </h3>
             </div>
-            <span className="text-xs text-text-muted shrink-0">
-              {formatTime(createdAt)}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {unreadCount > 0 && (
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold shrink-0">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </div>
+              )}
+              <span className="text-xs text-text-muted shrink-0">
+                {formatTime(createdAt)}
+              </span>
+            </div>
           </div>
           <p className="text-xs text-text-secondary truncate">
             Created {formatDate(createdAt)}

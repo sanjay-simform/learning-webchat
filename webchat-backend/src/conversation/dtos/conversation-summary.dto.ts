@@ -11,4 +11,5 @@ export class ConversationSummaryDto {
   createdAt: Date;
   encryptedConversationKey: string;
   peer: ConversationPeerDto;
+  unreadCount: number;
 }

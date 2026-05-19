@@ -13,6 +13,7 @@ interface ChatListSidebarProps {
   onNewChatClick: () => void;
   searchQuery: string;
   isLoading: boolean;
+  unreadCounts?: Record<string, number>;
 }
 
 export const ChatListSidebar = ({
@@ -22,6 +23,7 @@ export const ChatListSidebar = ({
   onNewChatClick,
   searchQuery,
   isLoading,
+  unreadCounts = {},
 }: ChatListSidebarProps) => {
   "use no memo";
 
@@ -118,6 +120,7 @@ export const ChatListSidebar = ({
                       conversation={conversation}
                       isSelected={selectedChat?.id === conversation.id}
                       onClick={() => onSelectConversation(conversation)}
+                      unreadCount={unreadCounts[conversation.id] ?? 0}
                     />
                   </div>
                 );

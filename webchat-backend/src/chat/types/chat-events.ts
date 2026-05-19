@@ -44,3 +44,9 @@ export interface MessageDeliveryAckEvent {
   ackAt: string;
   payload?: MessagePayload;
 }
+
+export interface UnreadCountUpdatedEvent {
+  conversationId: string;
+  unreadCount: number;
+  recipientUserId: string;
+}

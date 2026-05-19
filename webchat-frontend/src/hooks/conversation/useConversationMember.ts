@@ -59,16 +59,47 @@ export const useConversationMemberEvent = (
         }
 
         // Create ConversationSummaryDto from the event payload
-        // const newConversation: ConversationSummaryDto = {
-        //   id: payload.conversation.id,
-        //   createdAt: payload.conversation.createdAt,
-        //   encryptedConversationKey: payload.encryptedConversationKey,
-        //   peer: {
-        //     id: invitingUser.user.id,
-        //     username: invitingUser.user.username,
-        //     userProfile: invitingUser.user.profile,
+        const newConversation: ConversationSummaryDto = {
+          id: payload.conversation.id,
+          createdAt: payload.conversation.createdAt,
+          encryptedConversationKey: payload.encryptedConversationKey,
+          peer: {
+            id: invitingUser.user.id,
+            username: invitingUser.user.username,
+            userProfile: invitingUser.user.profile,
+          },
+        };
+
+        // Update the conversations query cache to include the new conversation
+        // queryClient.setQueryData(
+        //   ["conversations"],
+        //   (oldData: { data: ConversationSummaryDto[] | null } | undefined) => {
+        //     if (!oldData?.data) {
+        //       return { data: [newConversation], error: null };
+        //     }
+
+        //     // Check if conversation already exists to avoid duplicates
+        //     const conversationExists = oldData.data.some(
+        //       (conv) => conv.id === newConversation.id,
+        //     );
+
+        //     if (conversationExists) {
+        //       return oldData;
+        //     }
+
+        //     // Add new conversation to the beginning of the list
+        //     return {
+        //       ...oldData,
+        //       data: [newConversation, ...oldData.data],
+        //     };
         //   },
-        // };
+        // );
+
+        console.log(
+          "Conversation added to cache:",
+          newConversation.id,
+          newConversation.peer.username,
+        );
 
         // Call the callback to notify parent component (e.g., show toast)
         if (onConversationInvited) {

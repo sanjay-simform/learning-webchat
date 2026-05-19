@@ -36,6 +36,13 @@ export class ConversationMember {
   })
   encryptedConversationKey!: string;
 
+  @Column({
+    type: 'integer',
+    default: 0,
+  })
+  @Index('IDX_CONV_MEMBER_UNREAD_COUNT')
+  unreadCount!: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 

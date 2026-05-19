@@ -23,9 +23,11 @@ import {
   SendMessageDto,
 } from './dtos';
 import { ConnectionRegistryService } from './services/connection-registry.service';
+import { ChatActivityService } from './services/chat-activity.service';
 
 interface AuthenticatedSocket extends WebSocket {
   userId?: string;
+  socketId?: string;
 }
 
 interface MessageQueuedResponse {
@@ -42,6 +44,7 @@ export class ChatGateway {
   constructor(
     private readonly jwtService: JwtService,
     private readonly connectionRegistry: ConnectionRegistryService,
+    private readonly chatActivityService: ChatActivityService,
     @Inject(REDIS_CONNECTION)
     private readonly commandRedis: IORedis,
   ) {}
@@ -70,8 +73,23 @@ export class ChatGateway {
 
       const authenticatedClient = client as AuthenticatedSocket;
       authenticatedClient.userId = payload.sub;
+      // Generate a unique socket ID
+      authenticatedClient.socketId = `${payload.sub}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       this.connectionRegistry.register(payload.sub, client);
+      this.chatActivityService.registerConnection(
+        payload.sub,
+        authenticatedClient.socketId,
+      );
+
+      // Send currently online users to the newly connected client
+      const currentOnlineUsers = this.connectionRegistry
+        .getOnlineUsers()
+        .filter((id) => id !== payload.sub);
+      this.emitDirect(client, 'initial_online_users', {
+        userIds: currentOnlineUsers,
+        timestamp: Math.floor(Date.now() / 1000),
+      });
 
       // Broadcast to all other online users that this user came online
       this.broadcastPresenceUpdate(payload.sub, 'user_came_online');
@@ -83,11 +101,15 @@ export class ChatGateway {
 
   handleDisconnect(client: WebSocket): void {
     const authenticatedClient = client as AuthenticatedSocket;
-    if (!authenticatedClient.userId) {
+    if (!authenticatedClient.userId || !authenticatedClient.socketId) {
       return;
     }
 
     this.connectionRegistry.remove(authenticatedClient.userId, client);
+    this.chatActivityService.removeConnection(
+      authenticatedClient.userId,
+      authenticatedClient.socketId,
+    );
 
     // Check if user is now completely offline
     if (!this.connectionRegistry.isUserOnline(authenticatedClient.userId)) {
@@ -235,6 +257,30 @@ export class ChatGateway {
     }
   }
 
+  @SubscribeMessage('set_active_conversation')
+  async handleSetActiveConversation(
+    @ConnectedSocket() client: WebSocket,
+    @MessageBody() dto: { conversationId: string | null },
+  ): Promise<void> {
+    const authenticatedClient = client as AuthenticatedSocket;
+    const userId = authenticatedClient.userId;
+    const socketId = authenticatedClient.socketId;
+
+    if (!userId || !socketId) {
+      throw new WsException('Unauthorized websocket session');
+    }
+
+    if (dto.conversationId) {
+      this.chatActivityService.setActiveConversation(
+        userId,
+        socketId,
+        dto.conversationId,
+      );
+    } else {
+      this.chatActivityService.clearActiveConversation(userId, socketId);
+    }
+  }
+
   private emitDirect(client: WebSocket, event: string, data: unknown): void {
     if (client.readyState !== WebSocket.OPEN) {
       return;
@@ -286,6 +332,31 @@ export class ChatGateway {
     for (const onlineUserId of onlineUsers) {
       if (onlineUserId !== authenticatedClient.userId) {
         this.connectionRegistry.emitToUser(onlineUserId, 'user_typing', {
+          typingUserId: authenticatedClient.userId,
+          conversationId: dto.conversationId,
+        });
+      }
+    }
+  }
+
+  /**
+   * Handle user stop typing indicator
+   */
+  @SubscribeMessage('user_stop_typing')
+  handleUserStopTyping(
+    @ConnectedSocket() client: WebSocket,
+    @MessageBody() dto: { conversationId: string },
+  ): void {
+    const authenticatedClient = client as AuthenticatedSocket;
+    if (!authenticatedClient.userId) {
+      throw new WsException('Unauthorized websocket session');
+    }
+
+    // Broadcast stop typing indicator to all other online users
+    const onlineUsers = this.connectionRegistry.getOnlineUsers();
+    for (const onlineUserId of onlineUsers) {
+      if (onlineUserId !== authenticatedClient.userId) {
+        this.connectionRegistry.emitToUser(onlineUserId, 'user_stop_typing', {
           typingUserId: authenticatedClient.userId,
           conversationId: dto.conversationId,
         });

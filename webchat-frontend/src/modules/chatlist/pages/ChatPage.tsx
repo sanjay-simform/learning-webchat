@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "motion/react";
 import { MainLayout } from "../../../layouts/MainLayout";
 import {
@@ -11,9 +11,13 @@ import type { Chat } from "../../../types/chat";
 import { useConversations } from "../../../api-client/services/conversation/conversation.service";
 import type { ConversationSummaryDto } from "../../../api-client/services/conversation/conversation.service.dto";
 import { useAuth } from "../../../context/AuthContext";
+import { useSocket } from "../../../context/SocketContext";
 import { useConversationMessages } from "../../../hooks/useConversationMessages";
 import { useConversationMemberEvent } from "../../../hooks/conversation/useConversationMember";
+import { useUnreadMessages } from "../../../hooks/chat/useUnreadMessages";
+import { useUnreadCountSocketEvents } from "../../../hooks/chat/useUnreadCountSocketEvents";
 import { useToast, ToastContainer } from "../../../components/Toast";
+import { apiClient } from "../../../api-client/api-client";
 
 const mapConversationToChat = (conversation: ConversationSummaryDto): Chat => ({
   id: conversation.id,
@@ -23,6 +27,7 @@ const mapConversationToChat = (conversation: ConversationSummaryDto): Chat => ({
 
 export const ChatPage = () => {
   const { user } = useAuth();
+  const { sendEvent, status: socketStatus } = useSocket();
   const [selectedConversation, setSelectedConversation] =
     useState<ConversationSummaryDto | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +35,8 @@ export const ChatPage = () => {
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
 
   const { toasts, addToast, removeToast } = useToast();
+  const { unreadCounts, setAllUnreadCounts, setUnreadCount, resetUnread } =
+    useUnreadMessages();
 
   // Listen for conversation invitation events
   useConversationMemberEvent((username: string) => {
@@ -43,15 +50,89 @@ export const ChatPage = () => {
     : null;
   const conversationMessages = useConversationMessages(selectedConversation);
 
-  const handleSelectConversation = (conversation: ConversationSummaryDto) => {
-    setSelectedConversation(conversation);
-    setIsMobileMenuOpen(false);
-  };
+  // Fetch unread counts when socket connects or reconnects
+  const fetchUnreadCounts = useCallback(async () => {
+    try {
+      const response = await apiClient.get<Record<string, number>>(
+        "/conversations/unread-counts",
+      );
+      if (response.data) {
+        setAllUnreadCounts(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch unread counts:", error);
+    }
+  }, [setAllUnreadCounts]);
+
+  // Initialize unread counts from current conversations
+  useEffect(() => {
+    if (conversations.length > 0) {
+      const counts: Record<string, number> = {};
+      for (const conv of conversations) {
+        counts[conv.id] = conv.unreadCount;
+      }
+      setAllUnreadCounts(counts);
+    }
+  }, [conversations, setAllUnreadCounts]);
+
+  // Handle socket reconnection
+  useEffect(() => {
+    if (socketStatus === "connected") {
+      void fetchUnreadCounts();
+    }
+  }, [socketStatus, fetchUnreadCounts]);
+
+  // Listen to unread count updates from socket
+  useUnreadCountSocketEvents({
+    onUnreadCountUpdated: (event) => {
+      setUnreadCount(event.conversationId, event.unreadCount);
+    },
+  });
+
+  const handleSelectConversation = useCallback(
+    (conversation: ConversationSummaryDto) => {
+      setSelectedConversation(conversation);
+      setIsMobileMenuOpen(false);
+
+      // Set active conversation on backend
+      try {
+        sendEvent("set_active_conversation", {
+          conversationId: conversation.id,
+        });
+      } catch {
+        console.error("Failed to set active conversation on backend");
+      }
+
+      // Reset unread count and notify backend
+      resetUnread(conversation.id);
+      const markAsReadAsync = async () => {
+        try {
+          await apiClient.put(
+            `/conversations/${conversation.id}/mark-as-read`,
+            {},
+          );
+        } catch (error) {
+          console.error("Failed to mark conversation as read:", error);
+        }
+      };
+      void markAsReadAsync();
+    },
+    [sendEvent, resetUnread],
+  );
 
   const handleConversationCreated = (conversation: ConversationSummaryDto) => {
     setSelectedConversation(conversation);
     setIsNewChatModalOpen(false);
     setIsMobileMenuOpen(false);
+
+    // Set active conversation
+    try {
+      sendEvent("set_active_conversation", {
+        conversationId: conversation.id,
+      });
+    } catch {
+      console.error("Failed to set active conversation on backend");
+    }
   };
 
   return (
@@ -75,6 +156,7 @@ export const ChatPage = () => {
             onNewChatClick={() => setIsNewChatModalOpen(true)}
             searchQuery={searchQuery}
             isLoading={conversationsQuery.isLoading}
+            unreadCounts={unreadCounts}
           />
         </div>
       </motion.div>

@@ -129,6 +129,8 @@ export const ChatPanel = ({
     isNearBottomRef.current = true;
     topLoadArmedRef.current = false;
     pendingLoadMoreMetricsRef.current = null;
+    // Clear typing state when chat changes
+    setPeerIsTyping(false);
   }, [chat?.id]);
 
   useEffect(() => {
@@ -154,13 +156,15 @@ export const ChatPanel = ({
       },
     );
 
+    // Cleanup when chat changes - clear peer typing
     return () => {
+      setPeerIsTyping(false);
       unsubscribeTyping?.();
       unsubscribeStopTyping?.();
     };
   }, [chat?.id, onEvent]);
 
-  // Cleanup on unmount or chat change
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current !== null) {
@@ -228,6 +232,18 @@ export const ChatPanel = ({
       setUploadedImage(null);
       setUploadProgress(0);
       setSendError(null);
+
+      // Emit stop typing when message is sent
+      setIsTyping(false);
+      if (typingTimeoutRef.current !== null) {
+        window.clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      try {
+        sendEvent("user_stop_typing", { conversationId: chat.id });
+      } catch {
+        // Socket might not be ready, ignore
+      }
     } catch (error) {
       setSendError(
         error instanceof Error ? error.message : "Failed to send message",

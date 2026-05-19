@@ -13,6 +13,7 @@ import { FormInput } from "./FormInput";
 import { Skeleton, SkeletonCircle, SkeletonText } from "./Skeleton";
 import { cn } from "../lib/cn";
 import { UPLOAD_BASE_URL } from "../api-client/api-client";
+import { Cross, LucideCross } from "lucide-react";
 
 interface ProfileCardProps {
   className?: string;
@@ -39,7 +40,7 @@ export const ProfileCard = ({ className }: ProfileCardProps) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const profile = profileResponse?.data;
+  let profile = profileResponse?.data;
 
   // Initialize edit fields when profile loads
   useEffect(() => {
@@ -129,6 +130,22 @@ export const ProfileCard = ({ className }: ProfileCardProps) => {
     }
   };
 
+  const handleRemoveAvatar = () => {
+    updateProfile(
+      {
+        avatarUrl: null,
+      },
+      {
+        onSuccess: (response) => {
+          if (response.data) {
+            setSuccessMessage("Profile picture removed successfully!");
+            setTimeout(() => setSuccessMessage(null), 3000);
+          }
+        },
+      },
+    );
+  };
+
   // Get initials for avatar fallback
   const getInitials = () => {
     if (profile?.displayName) {
@@ -194,7 +211,7 @@ export const ProfileCard = ({ className }: ProfileCardProps) => {
                   <img
                     src={UPLOAD_BASE_URL + profile.avatarUrl}
                     alt={profile.displayName || "Profile"}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover aspect-square"
                   />
                 ) : (
                   <span className="text-3xl font-bold text-accent-cyan">
@@ -242,6 +259,18 @@ export const ProfileCard = ({ className }: ProfileCardProps) => {
                   </motion.div>
                 )}
               </div>
+              {profile?.avatarUrl ? (
+                <span
+                  className={cn(
+                    "bg-red-500 rounded-full absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 cursor-pointer hover:bg-red-600 transition-colors",
+                    isUpdating && "opacity-50 cursor-not-allowed",
+                  )}
+                  onClick={handleRemoveAvatar}
+                  title="Remove profile picture"
+                >
+                  <LucideCross className="w-6 h-6 text-white rotate-45" />
+                </span>
+              ) : null}
 
               {/* Hidden File Input */}
               <input

@@ -54,10 +54,6 @@ export class ConnectionRegistryService {
 
   emitToUser(userId: string, event: string, data: unknown): number {
     const sockets = this.socketsByUser.get(userId);
-    console.log(
-      '🚀 ~ ConnectionRegistryService ~ emitToUser ~ sockets:',
-      sockets,
-    );
     if (!sockets || sockets.size === 0) {
       return 0;
     }
