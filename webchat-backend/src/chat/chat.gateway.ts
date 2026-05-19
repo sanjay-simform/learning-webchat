@@ -258,10 +258,10 @@ export class ChatGateway {
   }
 
   @SubscribeMessage('set_active_conversation')
-  async handleSetActiveConversation(
+  handleSetActiveConversation(
     @ConnectedSocket() client: WebSocket,
     @MessageBody() dto: { conversationId: string | null },
-  ): Promise<void> {
+  ): void {
     const authenticatedClient = client as AuthenticatedSocket;
     const userId = authenticatedClient.userId;
     const socketId = authenticatedClient.socketId;

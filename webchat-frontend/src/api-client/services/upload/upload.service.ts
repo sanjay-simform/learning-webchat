@@ -60,7 +60,7 @@ export class UploadService {
   ): Promise<UploadResponse> {
     try {
       // Validate file
-      // UploadService.validateFile(file);
+      UploadService.validateFile(file);
 
       // Create FormData
       const formData = new FormData();
@@ -137,12 +137,12 @@ export class UploadService {
     }
 
     // Check file type
-    if (!UploadService.ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      throw {
-        message: "Invalid file type. Only image files are allowed.",
-        code: "INVALID_FILE_TYPE",
-      } as UploadError;
-    }
+    // if (!UploadService.ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    //   throw {
+    //     message: "Invalid file type. Only image files are allowed.",
+    //     code: "INVALID_FILE_TYPE",
+    //   } as UploadError;
+    // }
 
     // Check if file exists
     if (!file || file.size === 0) {
